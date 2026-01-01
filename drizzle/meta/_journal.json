@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1767000976330,
+      "tag": "0000_talented_shard",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1767083029860,
+      "tag": "0001_eager_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1767258449723,
+      "tag": "0002_friendly_maestro",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+import { NextFunction, Request, Response } from "express";
+import { UserAttributes } from "../types/models/users.js";
+import { UserRole } from "../config/constants.js";
+import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
+import { broadcast } from "../websocket/broadcast.js";
+import { db } from "../db/index.js";
+import { comments, posts, users } from "../db/schema.js";
+import { and, eq, isNull } from "drizzle-orm";
+import {
+  CommentAttributes,
+  CommentCreationAttributes,
+  OptionalCommentAttributes,
+} from "../types/models/comments.js";
+import {
+  insertCommentSchema,
+  updateCommentSchema,
+} from "../db/validate-schema.js";
+
+export const getComments = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const postId = Number(req.query.postId);
+    if (!postId)
+      return res
+        .status(HTTP_STATUS.BAD_REQUEST)
+        .json({ message: "Invalid Request" });
+
+    const commentDetails = await db
+      .select({
+        content: comments.content,
+        isActive: comments.isActive,
+        postTitle: posts.title,
+        postDesc: posts.description,
+        userName: users.name,
+      })
+      .from(comments)
+      .innerJoin(posts, eq(comments.postId, posts.id))
+      .innerJoin(users, eq(comments.userId, users.id))
+      .where(and(eq(comments.postId, postId), isNull(comments.deletedAt)));
+
+    res.status(HTTP_STATUS.OK).json({ commentDetails });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createComment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { content, postId }: CommentAttributes = req.body;
+    const userId = req?.user ? (req.user as UserAttributes)?.id : null;
+
+    let insertData: CommentCreationAttributes = {
+      content,
+      postId,
+      userId,
+    };
+
+    insertData = insertCommentSchema.parse(insertData);
+    const [{ id: insertId }] = await db
+      .insert(comments)
+      .values(insertData)
+      .$returningId();
+
+    broadcast({
+      event: SOCKET_EVENT.COMMENT.CREATED,
+      data: {
+        id: insertId,
+        content,
+        postId,
+        userId,
+      },
+    });
+
+    return res.status(HTTP_STATUS.CREATED).json({
+      message: "Comment created successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const editComment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { content, postId }: CommentAttributes = req.body;
+    const id = Number(req.params.id);
+    const { id: userId, role } = req.user as UserAttributes;
+
+    const [comment] = await db
+      .select()
+      .from(comments)
+      .where(
+        and(
+          eq(comments.id, id),
+          eq(comments.postId, postId),
+          isNull(comments.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!comment)
+      return res
+        .status(HTTP_STATUS.NOT_FOUND)
+        .json({ message: "Comment does not exists" });
+
+    if (comment?.userId !== userId && role !== UserRole.ADMIN)
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    let updateData: OptionalCommentAttributes = {
+      content,
+      updatedId: userId,
+    };
+    updateData = updateCommentSchema.parse(updateData);
+
+    await db.update(comments).set(updateData).where(eq(comments.id, id));
+
+    broadcast({
+      event: SOCKET_EVENT.COMMENT.UPDATED,
+      data: {
+        id: comment.id,
+        content: comment.content,
+        postId: comment.postId,
+        userId: comment.userId,
+      },
+    });
+
+    return res.status(HTTP_STATUS.OK).json({
+      message: "Comment updated successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteComment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const id = Number(req.params.id);
+    const { id: userId, role } = req.user as UserAttributes;
+
+    const [comment] = await db
+      .select()
+      .from(comments)
+      .where(and(eq(comments.id, id), isNull(comments.deletedAt)));
+
+    if (!comment)
+      return res
+        .status(HTTP_STATUS.NOT_FOUND)
+        .json({ message: "Comment does not exists" });
+
+    if (comment?.userId !== userId && role !== UserRole.ADMIN)
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    comment.deletedId = userId;
+    let updateData: OptionalCommentAttributes = {
+      isActive: false,
+      deletedId: userId,
+      deletedAt: new Date(),
+    };
+
+    updateData = updateCommentSchema.parse(updateData);
+    await db.update(comments).set(updateData).where(eq(comments.id, id));
+
+    broadcast({
+      event: SOCKET_EVENT.COMMENT.DELETED,
+      data: {
+        id: comment.id,
+        content: comment.content,
+        postId: comment.postId,
+        userId: comment.userId,
+      },
+    });
+
+    return res.status(HTTP_STATUS.OK).json({
+      message: "Comment Deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
