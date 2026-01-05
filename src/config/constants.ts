@@ -7,8 +7,6 @@ export const Constants = {
   PASSWORD_SALT: 10,
   INACTIVE: 0,
   ACTIVE: 1,
-  ACCESS_TOKEN_EXPIRY_TIME: 24 * 60 * 60, // 1 day
-  REFRESH_TOKEN_EXPIRY_TIME: 30 * 24 * 60 * 60, // 30 days
   SYSTEM: {
     ID: 0,
   },

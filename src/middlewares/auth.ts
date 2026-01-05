@@ -1,6 +1,6 @@
 import { NextFunction, Request, RequestHandler, Response } from "express";
 import passport from "passport";
-import { UserAttributes } from "../types/models/users.js";
+import { UserAttributes } from "../types/models.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 export const authenticateJwt: RequestHandler = passport.authenticate("jwt", {
@@ -30,7 +30,7 @@ export const authorizeRoles = (...allowedRoles: string[]) => {
 export const optionalAuth = (
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) => {
   passport.authenticate(
     "jwt",
@@ -43,6 +43,6 @@ export const optionalAuth = (
       }
 
       next();
-    },
+    }
   )(req, res, next);
 };

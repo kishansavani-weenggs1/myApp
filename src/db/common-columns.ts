@@ -27,3 +27,7 @@ export const operationIdCols = {
   updatedId: int("updated_id"),
   deletedId: int("deleted_id"),
 };
+
+export const createdIdCol = {
+  createdId: int("created_id").notNull(),
+};

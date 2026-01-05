@@ -6,7 +6,9 @@ let wss: WebSocketServer;
 
 export function initWebSocket(server: HttpServer): void {
   wss = new WebSocketServer({ server });
-  wss.on("connection", handleConnection);
+  wss.on("connection", (ws, req) => {
+    void handleConnection(ws, req);
+  });
 }
 
 export function getWss(): WebSocketServer {

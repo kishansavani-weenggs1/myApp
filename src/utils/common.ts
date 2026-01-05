@@ -1,7 +1,7 @@
 import * as bcrypt from "bcrypt";
 import { Constants } from "../config/constants.js";
 import jwt from "jsonwebtoken";
-import { UserAttributes } from "../types/models/users.js";
+import { UserAttributes } from "../types/models.js";
 import { ENV } from "../config/env.js";
 import { RawData } from "ws";
 
@@ -11,7 +11,7 @@ export const hashPassword = async (password: string) => {
 
 export const comparePassword = async (
   password: string,
-  hashedPassword: string,
+  hashedPassword: string
 ) => {
   return await bcrypt.compare(password, hashedPassword);
 };
@@ -24,7 +24,7 @@ export const generateAccessToken = (user: UserAttributes) => {
       tokenVersion: user.tokenVersion,
     },
     ENV.JWT.ACCESS_SECRET,
-    { expiresIn: Constants.ACCESS_TOKEN_EXPIRY_TIME },
+    { expiresIn: ENV.JWT.ACCESS_EXPIRES_IN }
   );
 };
 
@@ -35,7 +35,7 @@ export const generateRefreshToken = (user: UserAttributes) => {
       role: user.role,
     },
     ENV.JWT.REFRESH_SECRET,
-    { expiresIn: Constants.REFRESH_TOKEN_EXPIRY_TIME },
+    { expiresIn: ENV.JWT.REFRESH_EXPIRES_IN }
   );
 };
 

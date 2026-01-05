@@ -4,8 +4,8 @@ export const createPostSchema = z.object({
   body: z.object({
     title: z.string(),
     description: z.string(),
-    imageId: z.int().positive().optional(),
-    videoId: z.int().positive().optional(),
+    imageId: z.int().positive().nullable().optional(),
+    videoId: z.int().positive().nullable().optional(),
   }),
 });
 

@@ -1,7 +1,6 @@
 import { db } from "../index.js";
 import { users } from "../schema.js";
 import { hashPassword } from "../../utils/common.js";
-import { UserCreationAttributes } from "../../types/models/users.js";
 import { UserRole } from "../../config/constants.js";
 import { insertUserSchema } from "../validate-schema.js";
 
@@ -20,14 +19,12 @@ export async function seedAdmins() {
   for (const admin of admins) {
     const hashedPassword = await hashPassword("admin");
 
-    let insertData: UserCreationAttributes = {
+    const insertData = insertUserSchema.parse({
       name: admin.name,
       email: admin.email,
       password: hashedPassword,
       role: UserRole.ADMIN,
-    };
-
-    insertData = insertUserSchema.parse(insertData);
+    });
 
     const [{ id: insertId }] = await db
       .insert(users)

@@ -1,18 +1,14 @@
 import { NextFunction, Request, Response } from "express";
-import { UserAttributes } from "../types/models/users.js";
 import { REDIS, UserRole } from "../config/constants.js";
 import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
 import { broadcast } from "../websocket/broadcast.js";
 import { db } from "../db/index.js";
 import { posts, users } from "../db/schema.js";
 import { and, eq, isNull, like } from "drizzle-orm";
-import {
-  OptionalPostAttributes,
-  PostAttributes,
-  PostCreationAttributes,
-} from "../types/models/posts.js";
+import { UserAttributes } from "../types/models.js";
 import { insertPostSchema, updatePostSchema } from "../db/validate-schema.js";
 import { redis } from "../config/redis.js";
+import { CreatePostBody, EditPostBody } from "../types/zod.js";
 
 export const getPosts = async (
   req: Request,
@@ -71,19 +67,16 @@ export const createPost = async (
       description,
       imageId = null,
       videoId = null,
-    }: PostAttributes = req.body;
+    }: CreatePostBody = req.body;
     const userId = (req.user as UserAttributes)?.id;
 
-    let insertData: PostCreationAttributes = {
+    const insertData = insertPostSchema.parse({
       title,
       description,
       userId,
-    };
-
-    if (imageId) insertData.imageId = imageId;
-    if (videoId) insertData.videoId = videoId;
-
-    insertData = insertPostSchema.parse(insertData);
+      imageId,
+      videoId,
+    });
 
     const [{ id: insertId }] = await db
       .insert(posts)
@@ -113,7 +106,7 @@ export const editPost = async (
   next: NextFunction
 ) => {
   try {
-    const { title, description }: PostAttributes = req.body;
+    const { title, description }: EditPostBody = req.body;
     const id = Number(req.params?.id);
     const { id: userId, role } = req.user as UserAttributes;
 
@@ -133,13 +126,11 @@ export const editPost = async (
         .status(HTTP_STATUS.UNAUTHORIZED)
         .json({ message: "Invalid Request" });
 
-    let updateData: OptionalPostAttributes = {
+    const updateData = updatePostSchema.parse({
       title,
       description,
       updatedId: userId,
-    };
-
-    updateData = updatePostSchema.parse(updateData);
+    });
 
     await db.update(posts).set(updateData).where(eq(posts.id, id));
 
@@ -185,13 +176,11 @@ export const deletePost = async (
         .status(HTTP_STATUS.UNAUTHORIZED)
         .json({ message: "Invalid Request" });
 
-    let updateData: OptionalPostAttributes = {
+    const updateData = updatePostSchema.parse({
       isActive: false,
       deletedId: userId,
       deletedAt: new Date(),
-    };
-
-    updateData = updatePostSchema.parse(updateData);
+    });
 
     await db.update(posts).set(updateData).where(eq(posts.id, id));
 

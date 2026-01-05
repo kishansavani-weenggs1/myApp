@@ -1,5 +1,14 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { comments, fileUploads, messages, posts, users } from "./schema.js";
+import {
+  chatGroups,
+  comments,
+  fileUploads,
+  groupMembers,
+  groupMessages,
+  messages,
+  posts,
+  users,
+} from "./schema.js";
 
 export const insertUserSchema = createInsertSchema(users);
 export const updateUserSchema = insertUserSchema.omit({ id: true }).partial();
@@ -23,3 +32,21 @@ export const updateMessageSchema = insertMessageSchema
   .omit({ id: true })
   .partial();
 export const selectMessageSchema = createSelectSchema(messages);
+
+export const insertChatGroupSchema = createInsertSchema(chatGroups);
+export const updateChatGroupSchema = insertChatGroupSchema
+  .omit({ id: true })
+  .partial();
+export const selectChatGroupSchema = createSelectSchema(chatGroups);
+
+export const insertGroupMemberSchema = createInsertSchema(groupMembers);
+export const updateGroupMemberSchema = insertGroupMemberSchema
+  .omit({ id: true })
+  .partial();
+export const selectGroupMemberSchema = createSelectSchema(groupMembers);
+
+export const insertGroupMessageSchema = createInsertSchema(groupMessages);
+export const updateGroupMessageSchema = insertGroupMessageSchema
+  .omit({ id: true })
+  .partial();
+export const selectGroupMessageSchema = createSelectSchema(groupMessages);

@@ -25,6 +25,7 @@ export const ENV = {
   JWT: {
     ACCESS_SECRET: getEnv("JWT_ACCESS_SECRET"),
     REFRESH_SECRET: getEnv("JWT_REFRESH_SECRET"),
-    EXPIRES_IN: getEnv("JWT_EXPIRES_IN", false) || 86400, // 1 day default
+    ACCESS_EXPIRES_IN: Number(getEnv("JWT_ACCESS_EXPIRES_IN_HOURS")) * 60 * 60,
+    REFRESH_EXPIRES_IN: Number(getEnv("JWT_REFRESH_EXPIRES_IN_DAYS")) * 24 * 60 * 60,
   },
 };

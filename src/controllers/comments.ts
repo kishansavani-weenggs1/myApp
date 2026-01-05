@@ -1,20 +1,16 @@
 import { NextFunction, Request, Response } from "express";
-import { UserAttributes } from "../types/models/users.js";
 import { UserRole } from "../config/constants.js";
 import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
 import { broadcast } from "../websocket/broadcast.js";
 import { db } from "../db/index.js";
 import { comments, posts, users } from "../db/schema.js";
 import { and, eq, isNull } from "drizzle-orm";
-import {
-  CommentAttributes,
-  CommentCreationAttributes,
-  OptionalCommentAttributes,
-} from "../types/models/comments.js";
+import { UserAttributes } from "../types/models.js";
 import {
   insertCommentSchema,
   updateCommentSchema,
 } from "../db/validate-schema.js";
+import { CreateCommentBody, EditCommentBody } from "../types/zod.js";
 
 export const getComments = async (
   req: Request,
@@ -53,16 +49,15 @@ export const createComment = async (
   next: NextFunction
 ) => {
   try {
-    const { content, postId }: CommentAttributes = req.body;
+    const { content, postId }: CreateCommentBody = req.body;
     const userId = req?.user ? (req.user as UserAttributes)?.id : null;
 
-    let insertData: CommentCreationAttributes = {
+    const insertData = insertCommentSchema.parse({
       content,
       postId,
       userId,
-    };
+    });
 
-    insertData = insertCommentSchema.parse(insertData);
     const [{ id: insertId }] = await db
       .insert(comments)
       .values(insertData)
@@ -92,7 +87,7 @@ export const editComment = async (
   next: NextFunction
 ) => {
   try {
-    const { content, postId }: CommentAttributes = req.body;
+    const { content, postId }: EditCommentBody = req.body;
     const id = Number(req.params.id);
     const { id: userId, role } = req.user as UserAttributes;
 
@@ -118,11 +113,10 @@ export const editComment = async (
         .status(HTTP_STATUS.UNAUTHORIZED)
         .json({ message: "Invalid Request" });
 
-    let updateData: OptionalCommentAttributes = {
+    const updateData = updateCommentSchema.parse({
       content,
       updatedId: userId,
-    };
-    updateData = updateCommentSchema.parse(updateData);
+    });
 
     await db.update(comments).set(updateData).where(eq(comments.id, id));
 
@@ -169,13 +163,12 @@ export const deleteComment = async (
         .json({ message: "Invalid Request" });
 
     comment.deletedId = userId;
-    let updateData: OptionalCommentAttributes = {
+
+    const updateData = updateCommentSchema.parse({
       isActive: false,
       deletedId: userId,
       deletedAt: new Date(),
-    };
-
-    updateData = updateCommentSchema.parse(updateData);
+    });
     await db.update(comments).set(updateData).where(eq(comments.id, id));
 
     broadcast({

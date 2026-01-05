@@ -1,5 +1,4 @@
 import { NextFunction, Request, Response } from "express";
-import { UserAttributes } from "../types/models/users.js";
 import { MessageStatus, SOCKET_EVENT, UserRole } from "../config/constants.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { db } from "../db/index.js";
@@ -9,11 +8,9 @@ import {
   insertMessageSchema,
   updateMessageSchema,
 } from "../db/validate-schema.js";
-import {
-  MessageAttributes,
-  OptionalMessageAttributes,
-} from "../types/models/messages.js";
+import { UserAttributes } from "../types/models.js";
 import { isUserOnline, sendToUser } from "../websocket/wsStore.js";
+import { CreateMessageBody, EditMessageBody } from "../types/zod.js";
 
 export const getMessages = async (
   req: Request,
@@ -48,7 +45,7 @@ export const createMessage = async (
   next: NextFunction
 ) => {
   try {
-    const { message, toUserId }: MessageAttributes = req.body;
+    const { message, toUserId }: CreateMessageBody = req.body;
     const { id: userId } = req.user as UserAttributes;
 
     const insertData = insertMessageSchema.parse({
@@ -90,7 +87,7 @@ export const editMessage = async (
   next: NextFunction
 ) => {
   try {
-    const { message }: MessageAttributes = req.body;
+    const { message }: EditMessageBody = req.body;
     const id = Number(req.params?.id);
     const { id: userId } = req.user as UserAttributes;
 
@@ -113,7 +110,7 @@ export const editMessage = async (
     const updateData = updateMessageSchema.parse({
       message,
       updatedId: userId,
-    } as OptionalMessageAttributes);
+    });
 
     await db.update(messages).set(updateData).where(eq(messages.id, id));
 
@@ -164,7 +161,7 @@ export const deleteMessage = async (
     const updateData = updateMessageSchema.parse({
       deletedId: userId,
       deletedAt: new Date(),
-    } as OptionalMessageAttributes);
+    });
 
     await db.update(messages).set(updateData).where(eq(messages.id, id));
 
@@ -173,7 +170,6 @@ export const deleteMessage = async (
         event: SOCKET_EVENT.MESSAGE.DELETED,
         data: {
           fromUserId: userId,
-          message: messageInfo.message,
           sentAt: new Date(),
         },
       });
@@ -190,7 +186,7 @@ export const deleteMessage = async (
 const markDelivered = async (userId: number) => {
   const updateData = updateMessageSchema.parse({
     status: MessageStatus.DELIVERED,
-  } as OptionalMessageAttributes);
+  });
 
   return await db
     .update(messages)

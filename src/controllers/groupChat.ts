@@ -1,0 +1,529 @@
+import { NextFunction, Request, Response } from "express";
+import { SOCKET_EVENT, UserRole } from "../config/constants.js";
+import { HTTP_STATUS } from "../config/constants.js";
+import { db } from "../db/index.js";
+import {
+  chatGroups,
+  groupMembers,
+  groupMessages,
+  users,
+} from "../db/schema.js";
+import { and, eq, exists, inArray, isNull, sql } from "drizzle-orm";
+import {
+  insertChatGroupSchema,
+  insertGroupMemberSchema,
+  insertGroupMessageSchema,
+  updateChatGroupSchema,
+  updateGroupMemberSchema,
+  updateGroupMessageSchema,
+  updateMessageSchema,
+} from "../db/validate-schema.js";
+import {
+  UserAttributes,
+  GroupMemberCreationAttributes,
+} from "../types/models.js";
+import {
+  AddOrRemoveUserInGroupBody,
+  CreateGroupBody,
+  CreateGroupMessageBody,
+  EditGroupBody,
+  EditGroupMessageBody,
+} from "../types/zod.js";
+import { sendToGroup } from "../websocket/wsStore.js";
+
+export const getGroups = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const groups = await db
+      .select({
+        groupName: chatGroups.groupName,
+        groupAdmin: users.name,
+        groupMembers: groupMembers.id,
+      })
+      .from(chatGroups)
+      .innerJoin(users, eq(chatGroups.groupAdminId, users.id))
+      .innerJoin(groupMembers, eq(groupMembers.groupId, chatGroups.id))
+      .where(isNull(chatGroups.deletedAt));
+
+    res.status(HTTP_STATUS.OK).json({ groups });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createGroup = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { groupName, members }: CreateGroupBody = req.body;
+    const { id: userId } = req.user as UserAttributes;
+
+    const membersArr = members.filter((id) => id !== userId);
+
+    const [{ total }] = await db
+      .select({
+        total: sql<number>`count(*)`,
+      })
+      .from(users)
+      .where(and(inArray(users.id, membersArr), isNull(users.deletedAt)));
+
+    if (total !== membersArr.length) {
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "User not found",
+      });
+    }
+
+    const insertGroupData = insertChatGroupSchema.parse({
+      groupName,
+      groupAdminId: userId,
+    });
+
+    await db.transaction(async (tx) => {
+      const [{ id: insertId }] = await tx
+        .insert(chatGroups)
+        .values(insertGroupData)
+        .$returningId();
+
+      const groupAdminRecord = insertGroupMemberSchema.parse({
+        groupId: insertId,
+        userId,
+        isAdmin: true,
+        createdId: userId,
+      });
+
+      const groupMembersInsertData: GroupMemberCreationAttributes[] = [
+        groupAdminRecord,
+      ];
+      for (const member of membersArr) {
+        const insertMember = insertGroupMemberSchema.parse({
+          groupId: insertId,
+          userId: member,
+          isAdmin: false,
+          createdId: userId,
+        });
+        groupMembersInsertData.push(insertMember);
+      }
+
+      await tx.insert(groupMembers).values(groupMembersInsertData);
+    });
+
+    return res.status(HTTP_STATUS.CREATED).json({
+      message: "Group created successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const editGroup = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { groupName }: EditGroupBody = req.body;
+    const id = Number(req.params?.id);
+    const { id: userId, role } = req.user as UserAttributes;
+
+    const [groupInfo] = await db
+      .select()
+      .from(chatGroups)
+      .where(and(eq(chatGroups.id, id), isNull(chatGroups.deletedAt)))
+      .limit(1);
+
+    if (!groupInfo)
+      return res
+        .status(HTTP_STATUS.NOT_FOUND)
+        .json({ message: "Group does not exists" });
+
+    if (groupInfo?.groupAdminId !== userId && role !== UserRole.ADMIN)
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    const updateData = updateChatGroupSchema.parse({
+      groupName,
+      updatedId: userId,
+    });
+
+    await db.update(chatGroups).set(updateData).where(eq(chatGroups.id, id));
+
+    return res.status(HTTP_STATUS.OK).json({
+      message: "Group updated successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteGroup = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const id = Number(req.params.id);
+    const { id: userId, role } = req.user as UserAttributes;
+
+    const [groupInfo] = await db
+      .select()
+      .from(chatGroups)
+      .where(and(eq(chatGroups.id, id), isNull(chatGroups.deletedAt)))
+      .limit(1);
+
+    if (!groupInfo)
+      return res
+        .status(HTTP_STATUS.NOT_FOUND)
+        .json({ message: "Group does not exists" });
+
+    if (groupInfo?.groupAdminId !== userId && role !== UserRole.ADMIN)
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    const updateData = updateMessageSchema.parse({
+      deletedId: userId,
+      deletedAt: new Date(),
+    });
+
+    await db.update(chatGroups).set(updateData).where(eq(chatGroups.id, id));
+
+    return res.status(HTTP_STATUS.OK).json({
+      message: "Group Deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const addUserToGroup = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId, groupId }: AddOrRemoveUserInGroupBody = req.body;
+    const { id: currentUserId } = req.user as UserAttributes;
+
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt)));
+
+    if (!user)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "User Not Found",
+      });
+
+    const groupMemberId = await getGroupMemberId(userId, groupId);
+    if (groupMemberId)
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        message: "User is already a member of this group",
+      });
+
+    const insertData = insertGroupMemberSchema.parse({
+      userId,
+      groupId,
+      createdId: currentUserId,
+    });
+
+    await db.insert(groupMembers).values(insertData);
+
+    return res.status(HTTP_STATUS.CREATED).json({
+      message: "User added successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const removeUserFromGroup = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId, groupId }: AddOrRemoveUserInGroupBody = req.body;
+    const { id: currentUserId, role } = req.user as UserAttributes;
+
+    const [groupMemberInfo] = await db
+      .select({
+        groupMemberId: groupMembers.id,
+        groupAdminId: chatGroups.groupAdminId,
+      })
+      .from(groupMembers)
+      .innerJoin(chatGroups, eq(groupMembers.groupId, chatGroups.id))
+      .where(
+        and(
+          eq(groupMembers.userId, userId),
+          eq(groupMembers.groupId, groupId),
+          isNull(groupMembers.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!groupMemberInfo)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "User Not Found",
+      });
+
+    if (
+      groupMemberInfo?.groupAdminId !== currentUserId &&
+      role !== UserRole.ADMIN
+    )
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    const updateData = updateGroupMemberSchema.parse({
+      deletedId: currentUserId,
+      deletedAt: new Date(),
+    });
+
+    await db
+      .update(groupMembers)
+      .set(updateData)
+      .where(eq(groupMembers.id, groupMemberInfo.groupMemberId));
+
+    return res.status(HTTP_STATUS.OK).json({
+      message: "User Removed successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getGroupMessages = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const groupId = Number(req.params?.id);
+    const { id: userId } = req.user as UserAttributes;
+
+    const messages = await db
+      .select({
+        message: groupMessages.message,
+        status: groupMessages.status,
+        fromUserId: users.id,
+        fromUserName: users.name,
+      })
+      .from(groupMessages)
+      .innerJoin(users, eq(groupMessages.fromUserId, users.id))
+      .where(
+        and(
+          eq(groupMessages.groupId, groupId),
+          isNull(groupMessages.deletedAt),
+          exists(
+            db
+              .select({ id: groupMembers.id })
+              .from(groupMembers)
+              .where(
+                and(
+                  eq(groupMembers.groupId, groupMessages.groupId),
+                  eq(groupMembers.userId, userId),
+                  isNull(groupMembers.deletedAt)
+                )
+              )
+          )
+        )
+      );
+
+    res.status(HTTP_STATUS.OK).json({ messages });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createGroupMessage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { message, groupId }: CreateGroupMessageBody = req.body;
+    const { id: userId } = req.user as UserAttributes;
+
+    const groupMemberId = await getGroupMemberId(userId, groupId);
+    if (!groupMemberId)
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    const insertData = insertGroupMessageSchema.parse({
+      message,
+      groupId,
+      fromUserId: userId,
+    });
+
+    const [{ id: insertId }] = await db
+      .insert(groupMessages)
+      .values(insertData)
+      .$returningId();
+
+    sendToGroup(groupId, {
+      event: SOCKET_EVENT.MESSAGE.CREATED,
+      data: {
+        fromUserId: userId,
+        message,
+        sentAt: new Date(),
+      },
+    });
+
+    return res.status(HTTP_STATUS.CREATED).json({
+      message: "Message created successfully",
+      id: insertId,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const editGroupMessage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { message, groupId }: EditGroupMessageBody = req.body;
+    const id = Number(req.params?.id);
+    const { id: userId } = req.user as UserAttributes;
+
+    const groupMemberId = await getGroupMemberId(userId, groupId);
+    if (!groupMemberId)
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    const [messageInfo] = await db
+      .select()
+      .from(groupMessages)
+      .where(
+        and(
+          eq(groupMessages.id, id),
+          eq(groupMessages.groupId, groupId),
+          isNull(groupMessages.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!messageInfo)
+      return res
+        .status(HTTP_STATUS.NOT_FOUND)
+        .json({ message: "Message does not exists" });
+
+    if (messageInfo?.fromUserId !== userId)
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    const updateData = updateGroupMessageSchema.parse({
+      message,
+      updatedId: userId,
+    });
+
+    await db
+      .update(groupMessages)
+      .set(updateData)
+      .where(eq(groupMessages.id, id));
+
+    sendToGroup(groupId, {
+      event: SOCKET_EVENT.MESSAGE.UPDATED,
+      data: {
+        fromUserId: userId,
+        message,
+        sentAt: new Date(),
+      },
+    });
+
+    return res.status(HTTP_STATUS.OK).json({
+      message: "Message updated successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteGroupMessage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const id = Number(req.params.id);
+    const { id: userId, role } = req.user as UserAttributes;
+
+    const [messageInfo] = await db
+      .select()
+      .from(groupMessages)
+      .where(and(eq(groupMessages.id, id), isNull(groupMessages.deletedAt)))
+      .limit(1);
+
+    if (!messageInfo)
+      return res
+        .status(HTTP_STATUS.NOT_FOUND)
+        .json({ message: "Message does not exists" });
+
+    if (messageInfo?.fromUserId !== userId && role !== UserRole.ADMIN)
+      return res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: "Invalid Request" });
+
+    const updateData = updateGroupMessageSchema.parse({
+      deletedId: userId,
+      deletedAt: new Date(),
+    });
+
+    await db
+      .update(groupMessages)
+      .set(updateData)
+      .where(eq(groupMessages.id, id));
+
+    sendToGroup(messageInfo.groupId, {
+      event: SOCKET_EVENT.MESSAGE.DELETED,
+      data: {
+        fromUserId: userId,
+        sentAt: new Date(),
+      },
+    });
+
+    return res.status(HTTP_STATUS.OK).json({
+      message: "Message Deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getGroupMemberId = async (userId: number, groupId: number) => {
+  const [groupMemberId] = await db
+    .select({ id: groupMembers.id })
+    .from(groupMembers)
+    .where(
+      and(
+        eq(groupMembers.groupId, groupId),
+        eq(groupMembers.userId, userId),
+        isNull(groupMembers.deletedAt),
+        exists(
+          db
+            .select({ id: chatGroups.id })
+            .from(chatGroups)
+            .where(
+              and(
+                eq(chatGroups.id, groupMembers.groupId),
+                isNull(chatGroups.deletedAt)
+              )
+            )
+        )
+      )
+    )
+    .limit(1);
+
+  return groupMemberId;
+};

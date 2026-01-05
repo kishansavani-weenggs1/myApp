@@ -42,7 +42,6 @@ export default [
   // Ignore folders
   {
     ignores: [
-      "dist/**",
       "node_modules/**",
       "tsconfig.json",
       "drizzle/**",

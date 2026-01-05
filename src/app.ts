@@ -4,7 +4,7 @@ import authRoutes from "./routes/auth.js";
 import postRoutes from "./routes/posts.js";
 import commentRoutes from "./routes/comments.js";
 import fileUploadRoutes from "./routes/fileUpload.js";
-import messageRoutes from "./routes/messages.js";
+import messageRoutes from "./routes/chat.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { httpLogger } from "./middlewares/httpLogger.js";
 import cookieParser from "cookie-parser";
@@ -21,7 +21,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/upload", fileUploadRoutes);
-app.use("/api/messages", messageRoutes);
+app.use("/api/chat", messageRoutes);
 
 app.use(errorHandler);
 

@@ -9,16 +9,13 @@ import jwt from "jsonwebtoken";
 import { JwtPayload } from "../types/jwt.js";
 import { ENV } from "../config/env.js";
 import { Constants, UserRole } from "../config/constants.js";
-import {
-  UserAttributes,
-  UserCreationAttributes,
-  OptionalUserAttributes,
-} from "../types/models/users.js";
+import { UserAttributes } from "../types/models.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { insertUserSchema, updateUserSchema } from "../db/validate-schema.js";
 import { and, eq, isNull } from "drizzle-orm";
+import { changePasswordBody, LoginBody, SignUpBody } from "../types/zod.js";
 
 export const login = async (
   req: Request,
@@ -26,7 +23,7 @@ export const login = async (
   next: NextFunction
 ) => {
   try {
-    const { email, password }: UserAttributes = req.body;
+    const { email, password }: LoginBody = req.body;
 
     const [user] = await db
       .select()
@@ -50,13 +47,11 @@ export const login = async (
 
     const refreshToken = generateRefreshToken(user);
 
-    let updateData: OptionalUserAttributes = {
+    const updateData = updateUserSchema.parse({
       refreshToken,
       tokenVersion: user?.tokenVersion ? ++user.tokenVersion : 1,
       updatedId: Constants.SYSTEM.ID,
-    };
-
-    updateData = updateUserSchema.parse(updateData);
+    });
     await db.update(users).set(updateData).where(eq(users.id, user.id));
 
     const accessToken = generateAccessToken(user);
@@ -80,7 +75,7 @@ export const signup = async (
   next: NextFunction
 ) => {
   try {
-    const { name, email, password }: UserAttributes = req.body;
+    const { name, email, password }: SignUpBody = req.body;
 
     const [existingUser] = await db
       .select()
@@ -96,14 +91,12 @@ export const signup = async (
 
     const hashedPassword = await hashPassword(password);
 
-    let insertData: UserCreationAttributes = {
+    const insertData = insertUserSchema.parse({
       name,
       email,
       password: hashedPassword,
       role: UserRole.USER,
-    };
-
-    insertData = insertUserSchema.parse(insertData);
+    });
 
     await db.insert(users).values(insertData);
 
@@ -142,13 +135,11 @@ export const refreshAccessToken = async (
 
     const newRefreshToken = generateRefreshToken(user);
 
-    let updateData: OptionalUserAttributes = {
+    const updateData = updateUserSchema.parse({
       refreshToken: newRefreshToken,
       tokenVersion: user?.tokenVersion ? ++user.tokenVersion : 1,
       updatedId: user.id,
-    };
-
-    updateData = updateUserSchema.parse(updateData);
+    });
     await db.update(users).set(updateData).where(eq(users.id, user.id));
 
     const newAccessToken = generateAccessToken(user);
@@ -181,12 +172,11 @@ export const logout = async (
         .limit(1);
 
       if (userInfo && userInfo.id) {
-        let updateData: OptionalUserAttributes = {
+        const updateData = updateUserSchema.parse({
           refreshToken: null,
           tokenVersion: user?.tokenVersion ? ++user.tokenVersion : 1,
           updatedId: user.id,
-        };
-        updateData = updateUserSchema.parse(updateData);
+        });
         await db.update(users).set(updateData).where(eq(users.id, userInfo.id));
       } else {
         res
@@ -218,7 +208,7 @@ export const changePassword = async (
   next: NextFunction
 ) => {
   try {
-    const { oldPassword, newPassword } = req.body;
+    const { oldPassword, newPassword }: changePasswordBody = req.body;
     const user = req.user as UserAttributes;
 
     if (!user) {
@@ -227,7 +217,7 @@ export const changePassword = async (
         .json({ message: "Invalid credentials" });
     }
 
-    const isValid = await comparePassword(oldPassword as string, user.password);
+    const isValid = await comparePassword(oldPassword, user.password);
 
     if (!isValid) {
       return res
@@ -237,16 +227,14 @@ export const changePassword = async (
 
     const refreshToken = generateRefreshToken(user);
 
-    const hashedPassword = await hashPassword(newPassword as string);
+    const hashedPassword = await hashPassword(newPassword);
 
-    let updateData: OptionalUserAttributes = {
+    const updateData = updateUserSchema.parse({
       password: hashedPassword,
       refreshToken,
       tokenVersion: user?.tokenVersion ? ++user.tokenVersion : 1,
       updatedId: user.id,
-    };
-
-    updateData = updateUserSchema.parse(updateData);
+    });
     await db.update(users).set(updateData).where(eq(users.id, user.id));
 
     const accessToken = generateAccessToken(user);

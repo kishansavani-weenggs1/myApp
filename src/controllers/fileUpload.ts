@@ -1,7 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import { HTTP_STATUS } from "../config/constants.js";
-import { UserAttributes } from "../types/models/users.js";
-import { FileUploadCreationAttributes } from "../types/models/fileUploads.js";
+import {
+  UserAttributes,
+  FileUploadCreationAttributes,
+} from "../types/models.js";
 import { insertFileUploadsSchema } from "../db/validate-schema.js";
 import { db } from "../db/index.js";
 import { fileUploads } from "../db/schema.js";
