@@ -1,14 +1,10 @@
 import { sql } from "drizzle-orm";
-import { boolean, datetime, int } from "drizzle-orm/mysql-core";
+import { datetime, int } from "drizzle-orm/mysql-core";
 
 // Columns used in every table
 
 export const primaryCol = {
   id: int("id").autoincrement().primaryKey(),
-};
-
-export const isActiveCol = {
-  isActive: boolean("is_active").notNull().default(true),
 };
 
 export const timestampCols = {

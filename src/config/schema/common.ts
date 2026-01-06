@@ -5,3 +5,8 @@ export const commonDeleteSchema = z.object({
     id: z.coerce.number().int().positive(),
   }),
 });
+
+export const softDeleteSchema = z.object({
+  deletedId: z.number(),
+  deletedAt: z.date(),
+});

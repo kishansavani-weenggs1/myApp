@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { HTTP_STATUS } from "../config/constants.js";
+import { FileTypesForPosts, HTTP_STATUS } from "../config/constants.js";
 import {
   UserAttributes,
   FileUploadCreationAttributes,
@@ -7,13 +7,13 @@ import {
 import { insertFileUploadsSchema } from "../db/validate-schema.js";
 import { db } from "../db/index.js";
 import { fileUploads } from "../db/schema.js";
+import path from "path";
+import fs from "fs/promises";
 
-export const uploadFile = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
+const uploadFile =
+  (fileType: FileTypesForPosts) =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    const postId = Number(req.params.postId);
     const { id: userId } = req.user as UserAttributes;
 
     const files: Express.Multer.File[] = req.file
@@ -28,29 +28,43 @@ export const uploadFile = async (
         .json({ message: "File is required" });
     }
 
-    const insertData: FileUploadCreationAttributes[] = files.map((file) =>
-      insertFileUploadsSchema.parse({
-        url: file.path.replace(/^.*?uploads[\\/]/, ""),
-        mimeType: file.mimetype,
-        size: file.size,
-        createdId: userId,
-      })
-    );
+    try {
+      const insertData: FileUploadCreationAttributes[] = files.map((file) =>
+        insertFileUploadsSchema.parse({
+          postId: postId,
+          type: fileType,
+          name: path.basename(
+            file.originalname,
+            path.extname(file.originalname)
+          ),
+          url: file.path.replace(/^.*?uploads[\\/]/, ""),
+          mimeType: file.mimetype,
+          size: file.size,
+          createdId: userId,
+        })
+      );
 
-    const inserted = await db
-      .insert(fileUploads)
-      .values(insertData)
-      .$returningId();
+      const inserted = await db
+        .insert(fileUploads)
+        .values(insertData)
+        .$returningId();
 
-    res.status(HTTP_STATUS.CREATED).json({
-      count: inserted.length,
-      files: inserted.map((row, index) => ({
-        id: row.id,
-        url: insertData[index].url,
-      })),
-      message: "Files uploaded successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      res.status(HTTP_STATUS.CREATED).json({
+        count: inserted.length,
+        files: inserted.map((row, index) => ({
+          id: row.id,
+          url: insertData[index].url,
+        })),
+        message: "Files uploaded successfully",
+      });
+    } catch (error) {
+      await Promise.all(
+        files.map((file) => fs.unlink(file.path).catch(() => null))
+      );
+      next(error);
+    }
+  };
+
+export const uploadMainImage = uploadFile(FileTypesForPosts.MAIN_IMAGE);
+export const uploadMainVideo = uploadFile(FileTypesForPosts.MAIN_VIDEO);
+export const uploadOtherImages = uploadFile(FileTypesForPosts.OTHER_IMAGES);

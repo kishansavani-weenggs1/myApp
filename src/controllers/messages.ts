@@ -28,7 +28,10 @@ export const getMessages = async (
         fromUserName: users.name,
       })
       .from(messages)
-      .innerJoin(users, eq(messages.fromUserId, users.id))
+      .innerJoin(
+        users,
+        and(eq(messages.fromUserId, users.id), isNull(users.deletedAt))
+      )
       .where(and(eq(messages.toUserId, userId), isNull(messages.deletedAt)));
 
     await markDelivered(userId);

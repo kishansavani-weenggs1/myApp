@@ -61,3 +61,9 @@ export enum MessageStatus {
   DELIVERED = "DELIVERED",
   READ = "READ",
 }
+
+export enum FileTypesForPosts {
+  MAIN_IMAGE = "MAIN_IMAGE",
+  MAIN_VIDEO = "MAIN_VIDEO",
+  OTHER_IMAGES = "OTHER_IMAGES",
+}

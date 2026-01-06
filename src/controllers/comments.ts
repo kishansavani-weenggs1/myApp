@@ -11,6 +11,7 @@ import {
   updateCommentSchema,
 } from "../db/validate-schema.js";
 import { CreateCommentBody, EditCommentBody } from "../types/zod.js";
+import { softDeleteSchema } from "../config/schema/common.js";
 
 export const getComments = async (
   req: Request,
@@ -27,14 +28,19 @@ export const getComments = async (
     const commentDetails = await db
       .select({
         content: comments.content,
-        isActive: comments.isActive,
         postTitle: posts.title,
         postDesc: posts.description,
         userName: users.name,
       })
       .from(comments)
-      .innerJoin(posts, eq(comments.postId, posts.id))
-      .innerJoin(users, eq(comments.userId, users.id))
+      .innerJoin(
+        posts,
+        and(eq(comments.postId, posts.id), isNull(posts.deletedAt))
+      )
+      .innerJoin(
+        users,
+        and(eq(comments.userId, users.id), isNull(users.deletedAt))
+      )
       .where(and(eq(comments.postId, postId), isNull(comments.deletedAt)));
 
     res.status(HTTP_STATUS.OK).json({ commentDetails });
@@ -162,10 +168,7 @@ export const deleteComment = async (
         .status(HTTP_STATUS.UNAUTHORIZED)
         .json({ message: "Invalid Request" });
 
-    comment.deletedId = userId;
-
-    const updateData = updateCommentSchema.parse({
-      isActive: false,
+    const updateData = softDeleteSchema.parse({
       deletedId: userId,
       deletedAt: new Date(),
     });

@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { UserAttributes } from "../types/models.js";
 import { ENV } from "../config/env.js";
 import { RawData } from "ws";
+import path from "path";
 
 export const hashPassword = async (password: string) => {
   return await bcrypt.hash(password, Constants.PASSWORD_SALT);
@@ -45,3 +46,7 @@ export function rawDataToString(data: RawData): string {
   if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
   return Buffer.from(data).toString("utf8");
 }
+
+export const resolveUploadPath = (relativePath: string) => {
+  return path.resolve("src/uploads", relativePath);
+};

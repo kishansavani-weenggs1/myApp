@@ -3,12 +3,15 @@ import { REDIS, UserRole } from "../config/constants.js";
 import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
 import { broadcast } from "../websocket/broadcast.js";
 import { db } from "../db/index.js";
-import { posts, users } from "../db/schema.js";
-import { and, eq, isNull, like } from "drizzle-orm";
+import { comments, fileUploads, posts, users } from "../db/schema.js";
+import { and, eq, isNull, like, sql } from "drizzle-orm";
 import { UserAttributes } from "../types/models.js";
 import { insertPostSchema, updatePostSchema } from "../db/validate-schema.js";
 import { redis } from "../config/redis.js";
 import { CreatePostBody, EditPostBody } from "../types/zod.js";
+import { softDeleteSchema } from "../config/schema/common.js";
+import path from "path";
+import fs from "fs/promises";
 
 export const getPosts = async (
   req: Request,
@@ -19,9 +22,11 @@ export const getPosts = async (
     const { search = "" } = req.query;
     let response = {};
     let cachedPosts: string | null = "";
+
     if (!search) {
       cachedPosts = await redis.get(REDIS.CACHE_KEY.POSTS);
     }
+
     if (cachedPosts) {
       response = JSON.parse(cachedPosts);
       res.status(HTTP_STATUS.OK).json({ response });
@@ -31,16 +36,34 @@ export const getPosts = async (
           title: posts.title,
           description: posts.description,
           isPublished: posts.isPublished,
-          isActive: posts.isActive,
           userName: users.name,
+          files: sql<string[]>`
+            COALESCE(
+              JSON_ARRAYAGG(${fileUploads.url}),
+              JSON_ARRAY()
+            )`,
         })
         .from(posts)
-        .innerJoin(users, eq(posts.userId, users.id))
+        .innerJoin(
+          users,
+          and(eq(posts.userId, users.id), isNull(users.deletedAt))
+        )
+        .leftJoin(
+          fileUploads,
+          and(eq(posts.id, fileUploads.postId), isNull(fileUploads.deletedAt))
+        )
         .where(
           and(
             like(posts.title, `%${search as string}%`),
             isNull(posts.deletedAt)
           )
+        )
+        .groupBy(
+          posts.id,
+          posts.title,
+          posts.description,
+          posts.isPublished,
+          users.name
         );
 
       await redis.setEx(
@@ -62,20 +85,13 @@ export const createPost = async (
   next: NextFunction
 ) => {
   try {
-    const {
-      title,
-      description,
-      imageId = null,
-      videoId = null,
-    }: CreatePostBody = req.body;
+    const { title, description }: CreatePostBody = req.body;
     const userId = (req.user as UserAttributes)?.id;
 
     const insertData = insertPostSchema.parse({
       title,
       description,
       userId,
-      imageId,
-      videoId,
     });
 
     const [{ id: insertId }] = await db
@@ -176,13 +192,42 @@ export const deletePost = async (
         .status(HTTP_STATUS.UNAUTHORIZED)
         .json({ message: "Invalid Request" });
 
-    const updateData = updatePostSchema.parse({
-      isActive: false,
-      deletedId: userId,
-      deletedAt: new Date(),
-    });
+    await db.transaction(async (tx) => {
+      const deleteData = softDeleteSchema.parse({
+        deletedId: userId,
+        deletedAt: new Date(),
+      });
 
-    await db.update(posts).set(updateData).where(eq(posts.id, id));
+      await tx
+        .update(posts)
+        .set(deleteData)
+        .where(and(eq(posts.id, id), isNull(posts.deletedAt)));
+
+      await tx
+        .update(comments)
+        .set(deleteData)
+        .where(and(eq(comments.postId, id), isNull(comments.deletedAt)));
+
+      const files = await tx
+        .select({
+          id: fileUploads.id,
+          url: fileUploads.url,
+        })
+        .from(fileUploads)
+        .where(and(eq(fileUploads.postId, id), isNull(fileUploads.deletedAt)));
+
+      await Promise.all(
+        files.map(async (file) => {
+          const filePath = path.resolve("src/uploads", file.url);
+          await fs.unlink(filePath).catch(() => null);
+        })
+      );
+
+      await tx
+        .update(fileUploads)
+        .set(deleteData)
+        .where(and(eq(fileUploads.postId, id), isNull(fileUploads.deletedAt)));
+    });
 
     broadcast({
       event: SOCKET_EVENT.POST.DELETED,

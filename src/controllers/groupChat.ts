@@ -16,7 +16,6 @@ import {
   updateChatGroupSchema,
   updateGroupMemberSchema,
   updateGroupMessageSchema,
-  updateMessageSchema,
 } from "../db/validate-schema.js";
 import {
   UserAttributes,
@@ -30,6 +29,7 @@ import {
   EditGroupMessageBody,
 } from "../types/zod.js";
 import { sendToGroup } from "../websocket/wsStore.js";
+import { softDeleteSchema } from "../config/schema/common.js";
 
 export const getGroups = async (
   req: Request,
@@ -44,8 +44,17 @@ export const getGroups = async (
         groupMembers: groupMembers.id,
       })
       .from(chatGroups)
-      .innerJoin(users, eq(chatGroups.groupAdminId, users.id))
-      .innerJoin(groupMembers, eq(groupMembers.groupId, chatGroups.id))
+      .innerJoin(
+        users,
+        and(eq(chatGroups.groupAdminId, users.id), isNull(users.deletedAt))
+      )
+      .innerJoin(
+        groupMembers,
+        and(
+          eq(groupMembers.groupId, chatGroups.id),
+          isNull(groupMembers.deletedAt)
+        )
+      )
       .where(isNull(chatGroups.deletedAt));
 
     res.status(HTTP_STATUS.OK).json({ groups });
@@ -186,12 +195,31 @@ export const deleteGroup = async (
         .status(HTTP_STATUS.UNAUTHORIZED)
         .json({ message: "Invalid Request" });
 
-    const updateData = updateMessageSchema.parse({
-      deletedId: userId,
-      deletedAt: new Date(),
-    });
+    await db.transaction(async (tx) => {
+      const deleteData = softDeleteSchema.parse({
+        deletedId: userId,
+        deletedAt: new Date(),
+      });
 
-    await db.update(chatGroups).set(updateData).where(eq(chatGroups.id, id));
+      await tx
+        .update(chatGroups)
+        .set(deleteData)
+        .where(and(eq(chatGroups.id, id), isNull(chatGroups.deletedAt)));
+
+      await tx
+        .update(groupMembers)
+        .set(deleteData)
+        .where(
+          and(eq(groupMembers.groupId, id), isNull(groupMembers.deletedAt))
+        );
+
+      await tx
+        .update(groupMessages)
+        .set(deleteData)
+        .where(
+          and(eq(groupMessages.groupId, id), isNull(groupMessages.deletedAt))
+        );
+    });
 
     return res.status(HTTP_STATUS.OK).json({
       message: "Group Deleted successfully",
@@ -257,7 +285,13 @@ export const removeUserFromGroup = async (
         groupAdminId: chatGroups.groupAdminId,
       })
       .from(groupMembers)
-      .innerJoin(chatGroups, eq(groupMembers.groupId, chatGroups.id))
+      .innerJoin(
+        chatGroups,
+        and(
+          eq(groupMembers.groupId, chatGroups.id),
+          isNull(chatGroups.deletedAt)
+        )
+      )
       .where(
         and(
           eq(groupMembers.userId, userId),
@@ -315,7 +349,10 @@ export const getGroupMessages = async (
         fromUserName: users.name,
       })
       .from(groupMessages)
-      .innerJoin(users, eq(groupMessages.fromUserId, users.id))
+      .innerJoin(
+        users,
+        and(eq(groupMessages.fromUserId, users.id), isNull(users.deletedAt))
+      )
       .where(
         and(
           eq(groupMessages.groupId, groupId),

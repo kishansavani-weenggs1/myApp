@@ -8,22 +8,15 @@ import {
 } from "drizzle-orm/mysql-core";
 import {
   createdIdCol,
-  isActiveCol,
   operationIdCols,
   primaryCol,
   timestampCols,
 } from "./common-columns.js";
-import { MessageStatus, UserRole } from "../config/constants.js";
-
-export const fileUploads = mysqlTable("file_uploads", {
-  ...primaryCol,
-  url: varchar("url", { length: 255 }).notNull(),
-  size: int("size").notNull(),
-  mimeType: varchar("mime_type", { length: 255 }).notNull(),
-  ...createdIdCol,
-  ...operationIdCols,
-  ...timestampCols,
-});
+import {
+  FileTypesForPosts,
+  MessageStatus,
+  UserRole,
+} from "../config/constants.js";
 
 export const users = mysqlTable("users", {
   ...primaryCol,
@@ -35,7 +28,6 @@ export const users = mysqlTable("users", {
     .default(UserRole.USER),
   refreshToken: text("refresh_token"),
   tokenVersion: int("token_version").notNull().default(1),
-  ...isActiveCol,
   ...operationIdCols,
   ...timestampCols,
 });
@@ -44,13 +36,29 @@ export const posts = mysqlTable("posts", {
   ...primaryCol,
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description").notNull(),
-  imageId: int("image_id").references(() => fileUploads.id),
-  videoId: int("video_id").references(() => fileUploads.id),
   isPublished: boolean("is_published").notNull().default(true),
   userId: int("user_id")
     .notNull()
     .references(() => users.id),
-  ...isActiveCol,
+  ...operationIdCols,
+  ...timestampCols,
+});
+
+export const fileUploads = mysqlTable("file_uploads", {
+  ...primaryCol,
+  name: varchar("name", { length: 255 }).notNull(),
+  type: mysqlEnum("type", [
+    FileTypesForPosts.MAIN_IMAGE,
+    FileTypesForPosts.MAIN_VIDEO,
+    FileTypesForPosts.OTHER_IMAGES,
+  ]).notNull(),
+  url: varchar("url", { length: 255 }).notNull(),
+  size: int("size").notNull(),
+  mimeType: varchar("mime_type", { length: 255 }).notNull(),
+  postId: int("post_id")
+    .notNull()
+    .references(() => posts.id),
+  ...createdIdCol,
   ...operationIdCols,
   ...timestampCols,
 });
@@ -63,7 +71,6 @@ export const comments = mysqlTable("comments", {
   postId: int("post_id")
     .notNull()
     .references(() => posts.id),
-  ...isActiveCol,
   ...operationIdCols,
   ...timestampCols,
 });
