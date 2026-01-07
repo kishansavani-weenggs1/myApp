@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../swagger/zod.js";
 
 export const createMessageSchema = z.object({
   body: z.object({
@@ -13,6 +13,12 @@ export const editMessageSchema = z.object({
   }),
   params: z.object({
     id: z.coerce.number().int().positive(),
+  }),
+});
+
+export const getGroupMessagesSchema = z.object({
+  params: z.object({
+    groupId: z.coerce.number().int().positive(),
   }),
 });
 

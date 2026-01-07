@@ -1,23 +1,29 @@
-import { z } from "zod";
+import { z } from "../../swagger/zod.js";
 
-export const loginSchema = z.object({
-  body: z.object({
-    email: z.email(),
-    password: z.string(),
-  }),
-});
+export const loginSchema = z
+  .object({
+    body: z.object({
+      email: z.email().openapi({ example: "youremail@example.com" }),
+      password: z.string().openapi({ example: "Your Password" }),
+    }),
+  })
+  .openapi("LoginRequest");
 
-export const registerSchema = z.object({
-  body: z.object({
-    name: z.string(),
-    email: z.email(),
-    password: z.string(),
-  }),
-});
+export const registerSchema = z
+  .object({
+    body: z.object({
+      name: z.string().openapi({ example: "John" }),
+      email: z.email().openapi({ example: "youremail@example.com" }),
+      password: z.string().openapi({ example: "Your Password" }),
+    }),
+  })
+  .openapi("SignUpRequest");
 
-export const changePasswordSchema = z.object({
-  body: z.object({
-    oldPassword: z.string(),
-    newPassword: z.string(),
-  }),
-});
+export const changePasswordSchema = z
+  .object({
+    body: z.object({
+      oldPassword: z.string().openapi({ example: "Your Old Password" }),
+      newPassword: z.string().openapi({ example: "Your New Password" }),
+    }),
+  })
+  .openapi("ChangePasswordRequest");

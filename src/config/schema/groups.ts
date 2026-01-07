@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../swagger/zod.js";
 
 export const createGroupSchema = z.object({
   body: z.object({

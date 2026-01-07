@@ -67,3 +67,9 @@ export enum FileTypesForPosts {
   MAIN_VIDEO = "MAIN_VIDEO",
   OTHER_IMAGES = "OTHER_IMAGES",
 }
+
+export const RESPONSE = {
+  CLIENT_ERROR: "ClientErrorResponse",
+  SERVER_ERROR: "ServerErrorResponse",
+  VALIDATION_ERROR: "ValidationErrorResponse",
+};

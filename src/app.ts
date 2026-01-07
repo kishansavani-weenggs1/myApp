@@ -8,6 +8,8 @@ import messageRoutes from "./routes/chat.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { httpLogger } from "./middlewares/httpLogger.js";
 import cookieParser from "cookie-parser";
+import swaggerUi from "swagger-ui-express";
+import { openApiDocument } from "./swagger/openapi.js";
 
 const app: Application = express();
 
@@ -22,6 +24,9 @@ app.use("/api/posts", postRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/upload", fileUploadRoutes);
 app.use("/api/chat", messageRoutes);
+
+// Swagger UI
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
 app.use(errorHandler);
 

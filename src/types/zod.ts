@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../swagger/zod.js";
 import {
   addOrRemoveUserInGroupSchema,
   createGroupSchema,

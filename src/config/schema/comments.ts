@@ -1,6 +1,6 @@
-import { z } from "zod";
+import { z } from "../../swagger/zod.js";
 
-export const getCommentSchema = z.object({
+export const getCommentsSchema = z.object({
   query: z.object({
     postId: z.coerce.number().int().positive(),
   }),

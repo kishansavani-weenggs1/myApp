@@ -10,18 +10,18 @@ import { validate } from "../middlewares/validateZod.js";
 import {
   createCommentSchema,
   editCommentSchema,
-  getCommentSchema,
+  getCommentsSchema,
 } from "../config/schema/comments.js";
 import { commonDeleteSchema } from "../config/schema/common.js";
 
 const router = Router();
 
-router.get("/", validate(getCommentSchema), getComments);
+router.get("/", validate(getCommentsSchema), getComments);
 router.post(
   "/create",
   optionalAuth,
   validate(createCommentSchema),
-  createComment,
+  createComment
 );
 
 router.use(authenticateJwt);

@@ -1,5 +1,5 @@
 import * as bcrypt from "bcrypt";
-import { Constants } from "../config/constants.js";
+import { Constants, HTTP_STATUS, RESPONSE } from "../config/constants.js";
 import jwt from "jsonwebtoken";
 import { UserAttributes } from "../types/models.js";
 import { ENV } from "../config/env.js";
@@ -40,13 +40,34 @@ export const generateRefreshToken = (user: UserAttributes) => {
   );
 };
 
-export function rawDataToString(data: RawData): string {
+export const rawDataToString = (data: RawData): string => {
   if (typeof data === "string") return data;
   if (Buffer.isBuffer(data)) return data.toString("utf8");
   if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
   return Buffer.from(data).toString("utf8");
-}
+};
 
 export const resolveUploadPath = (relativePath: string) => {
   return path.resolve("src/uploads", relativePath);
+};
+
+export const withCommonResponses = (responses = {}) => {
+  return {
+    ...responses,
+    [HTTP_STATUS.BAD_REQUEST]: {
+      $ref: `#/components/responses/${RESPONSE.VALIDATION_ERROR}`,
+    },
+    [HTTP_STATUS.UNAUTHORIZED]: {
+      $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,
+    },
+    [HTTP_STATUS.FORBIDDEN]: {
+      $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,
+    },
+    [HTTP_STATUS.NOT_FOUND]: {
+      $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,
+    },
+    [HTTP_STATUS.INTERNAL_SERVER_ERROR]: {
+      $ref: `#/components/responses/${RESPONSE.SERVER_ERROR}`,
+    },
+  };
 };

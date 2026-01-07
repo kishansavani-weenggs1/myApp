@@ -7,6 +7,7 @@ import {
   createMessageSchema,
   editGroupMessageSchema,
   editMessageSchema,
+  getGroupMessagesSchema,
 } from "../config/schema/messages.js";
 import {
   createMessage,
@@ -66,7 +67,11 @@ router.post(
 
 // Group Messages
 
-router.get("/groups/get-messages/:id", getGroupMessages);
+router.get(
+  "/groups/get-messages/:groupId",
+  validate(getGroupMessagesSchema),
+  getGroupMessages
+);
 router.post(
   "/groups/send-message",
   validate(createGroupMessageSchema),

@@ -1,4 +1,5 @@
-import { z, ZodObject } from "zod";
+import { z } from "../swagger/zod.js";
+import { ZodObject } from "zod";
 import { Request, Response, NextFunction } from "express";
 import { HTTP_STATUS } from "../config/constants.js";
 

@@ -338,7 +338,7 @@ export const getGroupMessages = async (
   next: NextFunction
 ) => {
   try {
-    const groupId = Number(req.params?.id);
+    const groupId = Number(req.params?.groupId);
     const { id: userId } = req.user as UserAttributes;
 
     const messages = await db

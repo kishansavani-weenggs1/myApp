@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../swagger/zod.js";
 
 export const createPostSchema = z.object({
   body: z.object({
