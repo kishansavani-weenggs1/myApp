@@ -1,8 +1,10 @@
 import { registry } from "./registry.js";
-import { loginSchema } from "../config/schema/auth.js";
-import { ErrorSchema, ValidationErrorSchema } from "./errors.js";
+import {
+  ErrorSchema,
+  UnauthorizedErrorSchema,
+  ValidationErrorSchema,
+} from "./common-schema.js";
 
 registry.register("Error", ErrorSchema);
+registry.register("UnauthorizedError", UnauthorizedErrorSchema);
 registry.register("ValidationError", ValidationErrorSchema);
-
-registry.register("Login", loginSchema);

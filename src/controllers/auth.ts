@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import { RequestHandler } from "express";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -17,11 +17,7 @@ import { insertUserSchema, updateUserSchema } from "../db/validate-schema.js";
 import { and, eq, isNull } from "drizzle-orm";
 import { changePasswordBody, LoginBody, SignUpBody } from "../types/zod.js";
 
-export const login = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const login: RequestHandler = async (req, res, next) => {
   try {
     const { email, password }: LoginBody = req.body;
 
@@ -69,11 +65,7 @@ export const login = async (
   }
 };
 
-export const signup = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const signup: RequestHandler = async (req, res, next) => {
   try {
     const { name, email, password }: SignUpBody = req.body;
 
@@ -108,11 +100,7 @@ export const signup = async (
   }
 };
 
-export const refreshAccessToken = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const refreshAccessToken: RequestHandler = async (req, res, next) => {
   try {
     const token: string = req.cookies?.refreshToken;
     if (!token)
@@ -157,11 +145,7 @@ export const refreshAccessToken = async (
   }
 };
 
-export const logout = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const logout: RequestHandler = async (req, res, next) => {
   try {
     const user = req.user as UserAttributes;
     if (user && user.id) {
@@ -202,11 +186,7 @@ export const logout = async (
   }
 };
 
-export const changePassword = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const changePassword: RequestHandler = async (req, res, next) => {
   try {
     const { oldPassword, newPassword }: changePasswordBody = req.body;
     const user = req.user as UserAttributes;

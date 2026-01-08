@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import { RequestHandler } from "express";
 import { UserRole } from "../config/constants.js";
 import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
 import { broadcast } from "../websocket/broadcast.js";
@@ -13,17 +13,16 @@ import {
 import { CreateCommentBody, EditCommentBody } from "../types/zod.js";
 import { softDeleteSchema } from "../config/schema/common.js";
 
-export const getComments = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getComments: RequestHandler = async (req, res, next) => {
   try {
     const postId = Number(req.query.postId);
-    if (!postId)
-      return res
-        .status(HTTP_STATUS.BAD_REQUEST)
-        .json({ message: "Invalid Request" });
+
+    const postInfo = await checkPostExists(postId);
+
+    if (!postInfo)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "Post does not exists",
+      });
 
     const commentDetails = await db
       .select({
@@ -49,14 +48,17 @@ export const getComments = async (
   }
 };
 
-export const createComment = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const createComment: RequestHandler = async (req, res, next) => {
   try {
     const { content, postId }: CreateCommentBody = req.body;
     const userId = req?.user ? (req.user as UserAttributes)?.id : null;
+
+    const postInfo = await checkPostExists(postId);
+
+    if (!postInfo)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "Post does not exists",
+      });
 
     const insertData = insertCommentSchema.parse({
       content,
@@ -87,15 +89,18 @@ export const createComment = async (
   }
 };
 
-export const editComment = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const editComment: RequestHandler = async (req, res, next) => {
   try {
     const { content, postId }: EditCommentBody = req.body;
     const id = Number(req.params.id);
     const { id: userId, role } = req.user as UserAttributes;
+
+    const postInfo = await checkPostExists(postId);
+
+    if (!postInfo)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "Post does not exists",
+      });
 
     const [comment] = await db
       .select()
@@ -144,11 +149,7 @@ export const editComment = async (
   }
 };
 
-export const deleteComment = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const deleteComment: RequestHandler = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const { id: userId, role } = req.user as UserAttributes;
@@ -190,4 +191,14 @@ export const deleteComment = async (
   } catch (error) {
     next(error);
   }
+};
+
+const checkPostExists = async (postId: number) => {
+  const [postInfo] = await db
+    .select({ id: posts.id })
+    .from(posts)
+    .where(and(eq(posts.id, postId), isNull(posts.deletedAt)))
+    .limit(1);
+
+  return postInfo;
 };

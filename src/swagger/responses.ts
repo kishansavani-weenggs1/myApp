@@ -12,6 +12,20 @@ registry.registerComponent("responses", RESPONSE.CLIENT_ERROR, {
   },
 });
 
+registry.registerComponent("responses", RESPONSE.UNAUTHORIZED_ERROR, {
+  description: "Unauthorized Error",
+  content: {
+    "application/json": {
+      schema: {
+        oneOf: [
+          { $ref: "#/components/schemas/UnauthorizedError" },
+          { $ref: "#/components/schemas/Error" },
+        ],
+      },
+    },
+  },
+});
+
 registry.registerComponent("responses", RESPONSE.SERVER_ERROR, {
   description: "Internal Server Error",
   content: {

@@ -1,10 +1,11 @@
 import { z } from "../swagger/zod.js";
 import { ZodObject } from "zod";
-import { Request, Response, NextFunction } from "express";
+import { RequestHandler } from "express";
 import { HTTP_STATUS } from "../config/constants.js";
 
 export const validate =
-  (schema: ZodObject) => (req: Request, res: Response, next: NextFunction) => {
+  (schema: ZodObject): RequestHandler =>
+  (req, res, next) => {
     const result = schema.safeParse({
       body: req.body,
       query: req.query,

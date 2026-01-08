@@ -21,16 +21,14 @@ import {
  * Individual Chat
  */
 
-const GetMessagesResponseSchema = z
-  .object({
-    receivedMessages: z.array(z.object()).openapi({
-      example: [
-        { someKey: "Some Values", otherKey: "Other Values" },
-        { someKey: "Some Values", otherKey: "Other Values" },
-      ],
-    }),
-  })
-  .openapi("GetMessagesResponse");
+const GetMessagesResponseSchema = z.object({
+  receivedMessages: z.array(z.object()).openapi({
+    example: [
+      { someKey: "Some Values", otherKey: "Other Values" },
+      { someKey: "Some Values", otherKey: "Other Values" },
+    ],
+  }),
+});
 
 registry.registerPath({
   method: "get",
@@ -39,16 +37,19 @@ registry.registerPath({
   description: "Get Messages",
   tags: ["Individual Chat"],
 
-  responses: withCommonResponses({
-    [HTTP_STATUS.OK]: {
-      description: "Success",
-      content: {
-        "application/json": {
-          schema: GetMessagesResponseSchema,
+  responses: withCommonResponses(
+    {
+      [HTTP_STATUS.OK]: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: GetMessagesResponseSchema,
+          },
         },
       },
     },
-  }),
+    [HTTP_STATUS.BAD_REQUEST, HTTP_STATUS.NOT_FOUND]
+  ),
 });
 
 registry.registerPath({
@@ -137,16 +138,14 @@ registry.registerPath({
  * Group
  */
 
-const GetGroupsResponseSchema = z
-  .object({
-    groups: z.array(z.object()).openapi({
-      example: [
-        { someKey: "Some Values", otherKey: "Other Values" },
-        { someKey: "Some Values", otherKey: "Other Values" },
-      ],
-    }),
-  })
-  .openapi("GetGroupsResponse");
+const GetGroupsResponseSchema = z.object({
+  groups: z.array(z.object()).openapi({
+    example: [
+      { someKey: "Some Values", otherKey: "Other Values" },
+      { someKey: "Some Values", otherKey: "Other Values" },
+    ],
+  }),
+});
 
 registry.registerPath({
   method: "get",
@@ -155,16 +154,19 @@ registry.registerPath({
   description: "Get Groups",
   tags: ["Groups"],
 
-  responses: withCommonResponses({
-    [HTTP_STATUS.OK]: {
-      description: "Success",
-      content: {
-        "application/json": {
-          schema: GetGroupsResponseSchema,
+  responses: withCommonResponses(
+    {
+      [HTTP_STATUS.OK]: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: GetGroupsResponseSchema,
+          },
         },
       },
     },
-  }),
+    [HTTP_STATUS.BAD_REQUEST, HTTP_STATUS.NOT_FOUND]
+  ),
 });
 
 registry.registerPath({
@@ -311,16 +313,14 @@ registry.registerPath({
  * Group Messages
  */
 
-const GetGroupMessagesResponseSchema = z
-  .object({
-    messages: z.array(z.object()).openapi({
-      example: [
-        { someKey: "Some Values", otherKey: "Other Values" },
-        { someKey: "Some Values", otherKey: "Other Values" },
-      ],
-    }),
-  })
-  .openapi("GetGroupMessagesResponse");
+const GetGroupMessagesResponseSchema = z.object({
+  messages: z.array(z.object()).openapi({
+    example: [
+      { someKey: "Some Values", otherKey: "Other Values" },
+      { someKey: "Some Values", otherKey: "Other Values" },
+    ],
+  }),
+});
 
 registry.registerPath({
   method: "get",

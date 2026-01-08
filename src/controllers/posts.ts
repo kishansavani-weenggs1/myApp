@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import { RequestHandler } from "express";
 import { REDIS, UserRole } from "../config/constants.js";
 import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
 import { broadcast } from "../websocket/broadcast.js";
@@ -13,11 +13,7 @@ import { softDeleteSchema } from "../config/schema/common.js";
 import path from "path";
 import fs from "fs/promises";
 
-export const getPosts = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getPosts: RequestHandler = async (req, res, next) => {
   try {
     const { search = "" } = req.query;
     let response = {};
@@ -79,11 +75,7 @@ export const getPosts = async (
   }
 };
 
-export const createPost = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const createPost: RequestHandler = async (req, res, next) => {
   try {
     const { title, description }: CreatePostBody = req.body;
     const userId = (req.user as UserAttributes)?.id;
@@ -116,11 +108,7 @@ export const createPost = async (
   }
 };
 
-export const editPost = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const editPost: RequestHandler = async (req, res, next) => {
   try {
     const { title, description }: EditPostBody = req.body;
     const id = Number(req.params?.id);
@@ -167,11 +155,7 @@ export const editPost = async (
   }
 };
 
-export const deletePost = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const deletePost: RequestHandler = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const { id: userId, role } = req.user as UserAttributes;

@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import { RequestHandler } from "express";
 import { FileTypesForPosts, HTTP_STATUS } from "../config/constants.js";
 import {
   UserAttributes,
@@ -11,8 +11,8 @@ import path from "path";
 import fs from "fs/promises";
 
 const uploadFile =
-  (fileType: FileTypesForPosts) =>
-  async (req: Request, res: Response, next: NextFunction) => {
+  (fileType: FileTypesForPosts): RequestHandler =>
+  async (req, res, next) => {
     const postId = Number(req.params.postId);
     const { id: userId } = req.user as UserAttributes;
 

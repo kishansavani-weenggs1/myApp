@@ -51,23 +51,43 @@ export const resolveUploadPath = (relativePath: string) => {
   return path.resolve("src/uploads", relativePath);
 };
 
-export const withCommonResponses = (responses = {}) => {
+type ResponsesMap = {
+  [key: string]: unknown;
+};
+
+export const withCommonResponses = (
+  responses = {},
+  excludeErrors: number[] = [],
+  includeForbiddenError = false
+) => {
+  const commonResponses: ResponsesMap = {};
+  if (!excludeErrors.includes(HTTP_STATUS.BAD_REQUEST))
+    commonResponses[HTTP_STATUS.BAD_REQUEST] = {
+      $ref: `#/components/responses/${RESPONSE.VALIDATION_ERROR}`,
+    };
+
+  if (!excludeErrors.includes(HTTP_STATUS.UNAUTHORIZED))
+    commonResponses[HTTP_STATUS.UNAUTHORIZED] = {
+      $ref: `#/components/responses/${RESPONSE.UNAUTHORIZED_ERROR}`,
+    };
+
+  if (includeForbiddenError)
+    commonResponses[HTTP_STATUS.FORBIDDEN] = {
+      $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,
+    };
+
+  if (!excludeErrors.includes(HTTP_STATUS.NOT_FOUND))
+    commonResponses[HTTP_STATUS.NOT_FOUND] = {
+      $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,
+    };
+
+  if (!excludeErrors.includes(HTTP_STATUS.INTERNAL_SERVER_ERROR))
+    commonResponses[HTTP_STATUS.INTERNAL_SERVER_ERROR] = {
+      $ref: `#/components/responses/${RESPONSE.SERVER_ERROR}`,
+    };
+
   return {
     ...responses,
-    [HTTP_STATUS.BAD_REQUEST]: {
-      $ref: `#/components/responses/${RESPONSE.VALIDATION_ERROR}`,
-    },
-    [HTTP_STATUS.UNAUTHORIZED]: {
-      $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,
-    },
-    [HTTP_STATUS.FORBIDDEN]: {
-      $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,
-    },
-    [HTTP_STATUS.NOT_FOUND]: {
-      $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,
-    },
-    [HTTP_STATUS.INTERNAL_SERVER_ERROR]: {
-      $ref: `#/components/responses/${RESPONSE.SERVER_ERROR}`,
-    },
+    ...commonResponses,
   };
 };

@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import { RequestHandler } from "express";
 import { SOCKET_EVENT, UserRole } from "../config/constants.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { db } from "../db/index.js";
@@ -31,11 +31,7 @@ import {
 import { sendToGroup } from "../websocket/wsStore.js";
 import { softDeleteSchema } from "../config/schema/common.js";
 
-export const getGroups = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getGroups: RequestHandler = async (req, res, next) => {
   try {
     const groups = await db
       .select({
@@ -63,11 +59,7 @@ export const getGroups = async (
   }
 };
 
-export const createGroup = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const createGroup: RequestHandler = async (req, res, next) => {
   try {
     const { groupName, members }: CreateGroupBody = req.body;
     const { id: userId } = req.user as UserAttributes;
@@ -129,11 +121,7 @@ export const createGroup = async (
   }
 };
 
-export const editGroup = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const editGroup: RequestHandler = async (req, res, next) => {
   try {
     const { groupName }: EditGroupBody = req.body;
     const id = Number(req.params?.id);
@@ -170,11 +158,7 @@ export const editGroup = async (
   }
 };
 
-export const deleteGroup = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const deleteGroup: RequestHandler = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const { id: userId, role } = req.user as UserAttributes;
@@ -229,11 +213,7 @@ export const deleteGroup = async (
   }
 };
 
-export const addUserToGroup = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const addUserToGroup: RequestHandler = async (req, res, next) => {
   try {
     const { userId, groupId }: AddOrRemoveUserInGroupBody = req.body;
     const { id: currentUserId } = req.user as UserAttributes;
@@ -270,11 +250,7 @@ export const addUserToGroup = async (
   }
 };
 
-export const removeUserFromGroup = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const removeUserFromGroup: RequestHandler = async (req, res, next) => {
   try {
     const { userId, groupId }: AddOrRemoveUserInGroupBody = req.body;
     const { id: currentUserId, role } = req.user as UserAttributes;
@@ -332,14 +308,17 @@ export const removeUserFromGroup = async (
   }
 };
 
-export const getGroupMessages = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getGroupMessages: RequestHandler = async (req, res, next) => {
   try {
     const groupId = Number(req.params?.groupId);
     const { id: userId } = req.user as UserAttributes;
+
+    const chatGroupId = await checkGroupExists(groupId);
+
+    if (!chatGroupId)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "Group not found",
+      });
 
     const messages = await db
       .select({
@@ -378,14 +357,17 @@ export const getGroupMessages = async (
   }
 };
 
-export const createGroupMessage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const createGroupMessage: RequestHandler = async (req, res, next) => {
   try {
     const { message, groupId }: CreateGroupMessageBody = req.body;
     const { id: userId } = req.user as UserAttributes;
+
+    const chatGroupId = await checkGroupExists(groupId);
+
+    if (!chatGroupId)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "Group not found",
+      });
 
     const groupMemberId = await getGroupMemberId(userId, groupId);
     if (!groupMemberId)
@@ -422,15 +404,18 @@ export const createGroupMessage = async (
   }
 };
 
-export const editGroupMessage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const editGroupMessage: RequestHandler = async (req, res, next) => {
   try {
     const { message, groupId }: EditGroupMessageBody = req.body;
     const id = Number(req.params?.id);
     const { id: userId } = req.user as UserAttributes;
+
+    const chatGroupId = await checkGroupExists(groupId);
+
+    if (!chatGroupId)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "Group not found",
+      });
 
     const groupMemberId = await getGroupMemberId(userId, groupId);
     if (!groupMemberId)
@@ -487,11 +472,7 @@ export const editGroupMessage = async (
   }
 };
 
-export const deleteGroupMessage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const deleteGroupMessage: RequestHandler = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const { id: userId, role } = req.user as UserAttributes;
@@ -563,4 +544,14 @@ const getGroupMemberId = async (userId: number, groupId: number) => {
     .limit(1);
 
   return groupMemberId;
+};
+
+const checkGroupExists = async (groupId: number) => {
+  const [chatGroupId] = await db
+    .select({ id: chatGroups.id })
+    .from(chatGroups)
+    .where(and(eq(chatGroups.id, groupId), isNull(chatGroups.deletedAt)))
+    .limit(1);
+
+  return chatGroupId;
 };

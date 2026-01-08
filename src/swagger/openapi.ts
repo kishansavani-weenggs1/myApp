@@ -3,7 +3,6 @@ import { registry } from "./registry.js";
 
 import "./responses.js";
 import "./schema.js";
-import "./common-schema.js";
 
 import "./security.js";
 

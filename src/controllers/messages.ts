@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import { RequestHandler } from "express";
 import { MessageStatus, SOCKET_EVENT, UserRole } from "../config/constants.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { db } from "../db/index.js";
@@ -12,11 +12,7 @@ import { UserAttributes } from "../types/models.js";
 import { isUserOnline, sendToUser } from "../websocket/wsStore.js";
 import { CreateMessageBody, EditMessageBody } from "../types/zod.js";
 
-export const getMessages = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getMessages: RequestHandler = async (req, res, next) => {
   try {
     const { id: userId } = req.user as UserAttributes;
 
@@ -42,14 +38,21 @@ export const getMessages = async (
   }
 };
 
-export const createMessage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const createMessage: RequestHandler = async (req, res, next) => {
   try {
     const { message, toUserId }: CreateMessageBody = req.body;
     const { id: userId } = req.user as UserAttributes;
+
+    const [userInfo] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, toUserId), isNull(users.deletedAt)))
+      .limit(1);
+
+    if (!userInfo)
+      return res.status(HTTP_STATUS.NOT_FOUND).json({
+        message: "User not found",
+      });
 
     const insertData = insertMessageSchema.parse({
       message,
@@ -84,11 +87,7 @@ export const createMessage = async (
   }
 };
 
-export const editMessage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const editMessage: RequestHandler = async (req, res, next) => {
   try {
     const { message }: EditMessageBody = req.body;
     const id = Number(req.params?.id);
@@ -136,11 +135,7 @@ export const editMessage = async (
   }
 };
 
-export const deleteMessage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const deleteMessage: RequestHandler = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const { id: userId, role } = req.user as UserAttributes;

@@ -10,16 +10,14 @@ import {
   getCommentsSchema,
 } from "../../config/schema/comments.js";
 
-const GetCommentsResponseSchema = z
-  .object({
-    commentDetails: z.array(z.object()).openapi({
-      example: [
-        { someKey: "Some Values", otherKey: "Other Values" },
-        { someKey: "Some Values", otherKey: "Other Values" },
-      ],
-    }),
-  })
-  .openapi("GetCommentsResponse");
+const GetCommentsResponseSchema = z.object({
+  commentDetails: z.array(z.object()).openapi({
+    example: [
+      { someKey: "Some Values", otherKey: "Other Values" },
+      { someKey: "Some Values", otherKey: "Other Values" },
+    ],
+  }),
+});
 
 registry.registerPath({
   method: "get",
@@ -33,16 +31,19 @@ registry.registerPath({
     query: getCommentsSchema.shape.query,
   },
 
-  responses: withCommonResponses({
-    [HTTP_STATUS.OK]: {
-      description: "Success",
-      content: {
-        "application/json": {
-          schema: GetCommentsResponseSchema,
+  responses: withCommonResponses(
+    {
+      [HTTP_STATUS.OK]: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: GetCommentsResponseSchema,
+          },
         },
       },
     },
-  }),
+    [HTTP_STATUS.UNAUTHORIZED]
+  ),
 });
 
 registry.registerPath({
@@ -63,16 +64,19 @@ registry.registerPath({
     },
   },
 
-  responses: withCommonResponses({
-    [HTTP_STATUS.CREATED]: {
-      description: "Success",
-      content: {
-        "application/json": {
-          schema: commonSuccessResponseSchema,
+  responses: withCommonResponses(
+    {
+      [HTTP_STATUS.CREATED]: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: commonSuccessResponseSchema,
+          },
         },
       },
     },
-  }),
+    [HTTP_STATUS.UNAUTHORIZED]
+  ),
 });
 
 registry.registerPath({

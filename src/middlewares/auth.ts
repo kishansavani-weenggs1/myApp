@@ -1,4 +1,4 @@
-import { NextFunction, Request, RequestHandler, Response } from "express";
+import { RequestHandler } from "express";
 import passport from "passport";
 import { UserAttributes } from "../types/models.js";
 import { HTTP_STATUS } from "../config/constants.js";
@@ -7,8 +7,9 @@ export const authenticateJwt: RequestHandler = passport.authenticate("jwt", {
   session: false,
 });
 
-export const authorizeRoles = (...allowedRoles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+export const authorizeRoles =
+  (...allowedRoles: string[]): RequestHandler =>
+  (req, res, next) => {
     const user = req.user as UserAttributes;
 
     if (!user) {
@@ -25,13 +26,8 @@ export const authorizeRoles = (...allowedRoles: string[]) => {
 
     next();
   };
-};
 
-export const optionalAuth = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const optionalAuth: RequestHandler = (req, res, next) => {
   passport.authenticate(
     "jwt",
     { session: false },
