@@ -20,6 +20,10 @@ export const REDIS = {
   DATA_EXPIRY_TIME: 30 * 60, // 30 minutes,
   CACHE_KEY: {
     POSTS: "posts",
+    COMMENTS: "comments",
+    MESSAGES: "messages",
+    GROUPS: "groups",
+    GROUP_MESSAGES: "group-messages",
   },
 };
 

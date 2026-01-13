@@ -2,6 +2,7 @@ import { RequestHandler } from "express";
 import {
   MESSAGE,
   MessageStatus,
+  REDIS,
   SOCKET_EVENT,
   UserRole,
 } from "../config/constants.js";
@@ -16,28 +17,44 @@ import {
 import { UserAttributes } from "../types/models.js";
 import { isUserOnline, sendToUser } from "../websocket/wsStore.js";
 import { CreateMessageBody, EditMessageBody } from "../types/zod.js";
+import { redis } from "../config/redis.js";
 
 export const getMessages: RequestHandler = async (req, res, next) => {
   try {
     const { id: userId } = req.user as UserAttributes;
 
-    const receivedMessages = await db
-      .select({
-        message: messages.message,
-        status: messages.status,
-        fromUserId: users.id,
-        fromUserName: users.name,
-      })
-      .from(messages)
-      .innerJoin(
-        users,
-        and(eq(messages.fromUserId, users.id), isNull(users.deletedAt))
-      )
-      .where(and(eq(messages.toUserId, userId), isNull(messages.deletedAt)));
+    const cachedMessages = await redis.get(
+      `${REDIS.CACHE_KEY.MESSAGES}-${userId}`
+    );
 
-    await markDelivered(userId);
+    if (cachedMessages) {
+      const response = JSON.parse(cachedMessages);
+      return res.status(HTTP_STATUS.OK).json({ response });
+    } else {
+      const receivedMessages = await db
+        .select({
+          message: messages.message,
+          status: messages.status,
+          fromUserId: users.id,
+          fromUserName: users.name,
+        })
+        .from(messages)
+        .innerJoin(
+          users,
+          and(eq(messages.fromUserId, users.id), isNull(users.deletedAt))
+        )
+        .where(and(eq(messages.toUserId, userId), isNull(messages.deletedAt)));
 
-    res.status(HTTP_STATUS.OK).json({ receivedMessages });
+      await markDelivered(userId);
+
+      await redis.setEx(
+        `${REDIS.CACHE_KEY.MESSAGES}-${userId}`,
+        REDIS.DATA_EXPIRY_TIME,
+        JSON.stringify(receivedMessages)
+      );
+
+      return res.status(HTTP_STATUS.OK).json({ receivedMessages });
+    }
   } catch (error) {
     next(error);
   }
@@ -83,6 +100,8 @@ export const createMessage: RequestHandler = async (req, res, next) => {
       await markDelivered(toUserId);
     }
 
+    await redis.del(`${REDIS.CACHE_KEY.MESSAGES}-${toUserId}`);
+
     return res.status(HTTP_STATUS.CREATED).json({
       message: MESSAGE.CREATED("Message"),
       id: insertId,
@@ -99,7 +118,11 @@ export const editMessage: RequestHandler = async (req, res, next) => {
     const { id: userId } = req.user as UserAttributes;
 
     const [messageInfo] = await db
-      .select()
+      .select({
+        id: messages.id,
+        fromUserId: messages.fromUserId,
+        toUserId: messages.toUserId,
+      })
       .from(messages)
       .where(and(eq(messages.id, id), isNull(messages.deletedAt)))
       .limit(1);
@@ -132,6 +155,8 @@ export const editMessage: RequestHandler = async (req, res, next) => {
       });
     }
 
+    await redis.del(`${REDIS.CACHE_KEY.MESSAGES}-${messageInfo.toUserId}`);
+
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.UPDATED("Message"),
     });
@@ -146,7 +171,11 @@ export const deleteMessage: RequestHandler = async (req, res, next) => {
     const { id: userId, role } = req.user as UserAttributes;
 
     const [messageInfo] = await db
-      .select()
+      .select({
+        id: messages.id,
+        fromUserId: messages.fromUserId,
+        toUserId: messages.toUserId,
+      })
       .from(messages)
       .where(and(eq(messages.id, id), isNull(messages.deletedAt)))
       .limit(1);
@@ -177,6 +206,8 @@ export const deleteMessage: RequestHandler = async (req, res, next) => {
         },
       });
     }
+
+    await redis.del(`${REDIS.CACHE_KEY.MESSAGES}-${messageInfo.toUserId}`);
 
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.DELETED("Message"),

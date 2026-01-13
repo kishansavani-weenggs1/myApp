@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import { MESSAGE, SOCKET_EVENT, UserRole } from "../config/constants.js";
+import { MESSAGE, REDIS, SOCKET_EVENT, UserRole } from "../config/constants.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { db } from "../db/index.js";
 import {
@@ -30,30 +30,49 @@ import {
 } from "../types/zod.js";
 import { sendToGroup } from "../websocket/wsStore.js";
 import { softDeleteSchema } from "../config/schema/common.js";
+import { redis } from "../config/redis.js";
 
 export const getGroups: RequestHandler = async (req, res, next) => {
   try {
-    const groups = await db
-      .select({
-        groupName: chatGroups.groupName,
-        groupAdmin: users.name,
-        groupMembers: groupMembers.id,
-      })
-      .from(chatGroups)
-      .innerJoin(
-        users,
-        and(eq(chatGroups.groupAdminId, users.id), isNull(users.deletedAt))
-      )
-      .innerJoin(
-        groupMembers,
-        and(
-          eq(groupMembers.groupId, chatGroups.id),
-          isNull(groupMembers.deletedAt)
-        )
-      )
-      .where(isNull(chatGroups.deletedAt));
+    const cachedGroups = await redis.get(REDIS.CACHE_KEY.GROUPS);
 
-    res.status(HTTP_STATUS.OK).json({ groups });
+    if (cachedGroups) {
+      const response = JSON.parse(cachedGroups);
+      return res.status(HTTP_STATUS.OK).json({ response });
+    } else {
+      const groups = await db
+        .select({
+          groupName: chatGroups.groupName,
+          groupAdmin: users.name,
+          groupMembers: sql<string[]>`
+                      COALESCE(
+                        JSON_ARRAYAGG(${groupMembers.id}),
+                        JSON_ARRAY()
+                      )`,
+        })
+        .from(chatGroups)
+        .innerJoin(
+          users,
+          and(eq(chatGroups.groupAdminId, users.id), isNull(users.deletedAt))
+        )
+        .innerJoin(
+          groupMembers,
+          and(
+            eq(groupMembers.groupId, chatGroups.id),
+            isNull(groupMembers.deletedAt)
+          )
+        )
+        .where(isNull(chatGroups.deletedAt))
+        .groupBy(chatGroups.id, chatGroups.groupName, users.name);
+
+      await redis.setEx(
+        REDIS.CACHE_KEY.GROUPS,
+        REDIS.DATA_EXPIRY_TIME,
+        JSON.stringify(groups)
+      );
+
+      return res.status(HTTP_STATUS.OK).json({ groups });
+    }
   } catch (error) {
     next(error);
   }
@@ -113,6 +132,8 @@ export const createGroup: RequestHandler = async (req, res, next) => {
       await tx.insert(groupMembers).values(groupMembersInsertData);
     });
 
+    await redis.del(REDIS.CACHE_KEY.GROUPS);
+
     return res.status(HTTP_STATUS.CREATED).json({
       message: MESSAGE.CREATED("Group"),
     });
@@ -128,7 +149,10 @@ export const editGroup: RequestHandler = async (req, res, next) => {
     const { id: userId, role } = req.user as UserAttributes;
 
     const [groupInfo] = await db
-      .select()
+      .select({
+        id: chatGroups.id,
+        groupAdminId: chatGroups.groupAdminId,
+      })
       .from(chatGroups)
       .where(and(eq(chatGroups.id, id), isNull(chatGroups.deletedAt)))
       .limit(1);
@@ -150,6 +174,8 @@ export const editGroup: RequestHandler = async (req, res, next) => {
 
     await db.update(chatGroups).set(updateData).where(eq(chatGroups.id, id));
 
+    await redis.del(REDIS.CACHE_KEY.GROUPS);
+
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.UPDATED("Group"),
     });
@@ -164,7 +190,10 @@ export const deleteGroup: RequestHandler = async (req, res, next) => {
     const { id: userId, role } = req.user as UserAttributes;
 
     const [groupInfo] = await db
-      .select()
+      .select({
+        id: chatGroups.id,
+        groupAdminId: chatGroups.groupAdminId,
+      })
       .from(chatGroups)
       .where(and(eq(chatGroups.id, id), isNull(chatGroups.deletedAt)))
       .limit(1);
@@ -205,6 +234,8 @@ export const deleteGroup: RequestHandler = async (req, res, next) => {
         );
     });
 
+    await redis.del(REDIS.CACHE_KEY.GROUPS);
+
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.DELETED("Group"),
     });
@@ -241,6 +272,8 @@ export const addUserToGroup: RequestHandler = async (req, res, next) => {
     });
 
     await db.insert(groupMembers).values(insertData);
+
+    await redis.del(REDIS.CACHE_KEY.GROUPS);
 
     return res.status(HTTP_STATUS.CREATED).json({
       message: MESSAGE.ADDED("User"),
@@ -300,6 +333,8 @@ export const removeUserFromGroup: RequestHandler = async (req, res, next) => {
       .set(updateData)
       .where(eq(groupMembers.id, groupMemberInfo.groupMemberId));
 
+    await redis.del(REDIS.CACHE_KEY.GROUPS);
+
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.REMOVED("User"),
     });
@@ -320,38 +355,53 @@ export const getGroupMessages: RequestHandler = async (req, res, next) => {
         message: MESSAGE.NOT_EXISTS("Group"),
       });
 
-    const messages = await db
-      .select({
-        message: groupMessages.message,
-        status: groupMessages.status,
-        fromUserId: users.id,
-        fromUserName: users.name,
-      })
-      .from(groupMessages)
-      .innerJoin(
-        users,
-        and(eq(groupMessages.fromUserId, users.id), isNull(users.deletedAt))
-      )
-      .where(
-        and(
-          eq(groupMessages.groupId, groupId),
-          isNull(groupMessages.deletedAt),
-          exists(
-            db
-              .select({ id: groupMembers.id })
-              .from(groupMembers)
-              .where(
-                and(
-                  eq(groupMembers.groupId, groupMessages.groupId),
-                  eq(groupMembers.userId, userId),
-                  isNull(groupMembers.deletedAt)
-                )
-              )
-          )
+    const cachedMessages = await redis.get(
+      `${REDIS.CACHE_KEY.GROUP_MESSAGES}-${groupId}`
+    );
+
+    if (cachedMessages) {
+      const response = JSON.parse(cachedMessages);
+      return res.status(HTTP_STATUS.OK).json({ response });
+    } else {
+      const receivedMessages = await db
+        .select({
+          message: groupMessages.message,
+          status: groupMessages.status,
+          fromUserId: users.id,
+          fromUserName: users.name,
+        })
+        .from(groupMessages)
+        .innerJoin(
+          users,
+          and(eq(groupMessages.fromUserId, users.id), isNull(users.deletedAt))
         )
+        .where(
+          and(
+            eq(groupMessages.groupId, groupId),
+            isNull(groupMessages.deletedAt),
+            exists(
+              db
+                .select({ id: groupMembers.id })
+                .from(groupMembers)
+                .where(
+                  and(
+                    eq(groupMembers.groupId, groupMessages.groupId),
+                    eq(groupMembers.userId, userId),
+                    isNull(groupMembers.deletedAt)
+                  )
+                )
+            )
+          )
+        );
+
+      await redis.setEx(
+        `${REDIS.CACHE_KEY.GROUP_MESSAGES}-${groupId}`,
+        REDIS.DATA_EXPIRY_TIME,
+        JSON.stringify(receivedMessages)
       );
 
-    res.status(HTTP_STATUS.OK).json({ messages });
+      return res.status(HTTP_STATUS.OK).json({ receivedMessages });
+    }
   } catch (error) {
     next(error);
   }
@@ -395,6 +445,8 @@ export const createGroupMessage: RequestHandler = async (req, res, next) => {
       },
     });
 
+    await redis.del(`${REDIS.CACHE_KEY.GROUP_MESSAGES}-${groupId}`);
+
     return res.status(HTTP_STATUS.CREATED).json({
       message: MESSAGE.CREATED("Message"),
       id: insertId,
@@ -424,7 +476,10 @@ export const editGroupMessage: RequestHandler = async (req, res, next) => {
         .json({ message: MESSAGE.UNAUTHORIZED });
 
     const [messageInfo] = await db
-      .select()
+      .select({
+        id: groupMessages.id,
+        fromUserId: groupMessages.fromUserId,
+      })
       .from(groupMessages)
       .where(
         and(
@@ -464,6 +519,8 @@ export const editGroupMessage: RequestHandler = async (req, res, next) => {
       },
     });
 
+    await redis.del(`${REDIS.CACHE_KEY.GROUP_MESSAGES}-${groupId}`);
+
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.UPDATED("Message"),
     });
@@ -478,7 +535,11 @@ export const deleteGroupMessage: RequestHandler = async (req, res, next) => {
     const { id: userId, role } = req.user as UserAttributes;
 
     const [messageInfo] = await db
-      .select()
+      .select({
+        id: groupMessages.id,
+        fromUserId: groupMessages.fromUserId,
+        groupId: groupMessages.groupId,
+      })
       .from(groupMessages)
       .where(and(eq(groupMessages.id, id), isNull(groupMessages.deletedAt)))
       .limit(1);
@@ -510,6 +571,8 @@ export const deleteGroupMessage: RequestHandler = async (req, res, next) => {
         sentAt: new Date(),
       },
     });
+
+    await redis.del(`${REDIS.CACHE_KEY.GROUP_MESSAGES}-${messageInfo.groupId}`);
 
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.DELETED("Message"),

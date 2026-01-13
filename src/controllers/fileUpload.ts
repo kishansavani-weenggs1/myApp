@@ -53,7 +53,7 @@ const uploadFile =
         .values(insertData)
         .$returningId();
 
-      res.status(HTTP_STATUS.CREATED).json({
+      return res.status(HTTP_STATUS.CREATED).json({
         count: inserted.length,
         files: inserted.map((row, index) => ({
           id: row.id,

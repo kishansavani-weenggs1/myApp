@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import { MESSAGE, UserRole } from "../config/constants.js";
+import { MESSAGE, REDIS, UserRole } from "../config/constants.js";
 import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
 import { broadcast } from "../websocket/broadcast.js";
 import { db } from "../db/index.js";
@@ -12,6 +12,7 @@ import {
 } from "../db/validate-schema.js";
 import { CreateCommentBody, EditCommentBody } from "../types/zod.js";
 import { softDeleteSchema } from "../config/schema/common.js";
+import { redis } from "../config/redis.js";
 
 export const getComments: RequestHandler = async (req, res, next) => {
   try {
@@ -24,25 +25,40 @@ export const getComments: RequestHandler = async (req, res, next) => {
         message: MESSAGE.NOT_EXISTS("Post"),
       });
 
-    const commentDetails = await db
-      .select({
-        content: comments.content,
-        postTitle: posts.title,
-        postDesc: posts.description,
-        userName: users.name,
-      })
-      .from(comments)
-      .innerJoin(
-        posts,
-        and(eq(comments.postId, posts.id), isNull(posts.deletedAt))
-      )
-      .innerJoin(
-        users,
-        and(eq(comments.userId, users.id), isNull(users.deletedAt))
-      )
-      .where(and(eq(comments.postId, postId), isNull(comments.deletedAt)));
+    const cachedComments = await redis.get(
+      `${REDIS.CACHE_KEY.COMMENTS}-${postId}`
+    );
 
-    res.status(HTTP_STATUS.OK).json({ commentDetails });
+    if (cachedComments) {
+      const response = JSON.parse(cachedComments);
+      return res.status(HTTP_STATUS.OK).json({ response });
+    } else {
+      const commentDetails = await db
+        .select({
+          content: comments.content,
+          postTitle: posts.title,
+          postDesc: posts.description,
+          userName: users.name,
+        })
+        .from(comments)
+        .innerJoin(
+          posts,
+          and(eq(comments.postId, posts.id), isNull(posts.deletedAt))
+        )
+        .innerJoin(
+          users,
+          and(eq(comments.userId, users.id), isNull(users.deletedAt))
+        )
+        .where(and(eq(comments.postId, postId), isNull(comments.deletedAt)));
+
+      await redis.setEx(
+        `${REDIS.CACHE_KEY.COMMENTS}-${postId}`,
+        REDIS.DATA_EXPIRY_TIME,
+        JSON.stringify(commentDetails)
+      );
+
+      return res.status(HTTP_STATUS.OK).json({ commentDetails });
+    }
   } catch (error) {
     next(error);
   }
@@ -81,6 +97,8 @@ export const createComment: RequestHandler = async (req, res, next) => {
       },
     });
 
+    await redis.del(`${REDIS.CACHE_KEY.COMMENTS}:${postId}`);
+
     return res.status(HTTP_STATUS.CREATED).json({
       message: MESSAGE.CREATED("Comment"),
     });
@@ -103,7 +121,12 @@ export const editComment: RequestHandler = async (req, res, next) => {
       });
 
     const [comment] = await db
-      .select()
+      .select({
+        id: comments.id,
+        content: comments.content,
+        postId: comments.postId,
+        userId: comments.userId,
+      })
       .from(comments)
       .where(
         and(
@@ -141,6 +164,8 @@ export const editComment: RequestHandler = async (req, res, next) => {
       },
     });
 
+    await redis.del(`${REDIS.CACHE_KEY.COMMENTS}:${postId}`);
+
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.UPDATED("Comment"),
     });
@@ -155,7 +180,12 @@ export const deleteComment: RequestHandler = async (req, res, next) => {
     const { id: userId, role } = req.user as UserAttributes;
 
     const [comment] = await db
-      .select()
+      .select({
+        id: comments.id,
+        content: comments.content,
+        postId: comments.postId,
+        userId: comments.userId,
+      })
       .from(comments)
       .where(and(eq(comments.id, id), isNull(comments.deletedAt)));
 
@@ -184,6 +214,8 @@ export const deleteComment: RequestHandler = async (req, res, next) => {
         userId: comment.userId,
       },
     });
+
+    await redis.del(`${REDIS.CACHE_KEY.COMMENTS}-${comment.postId}`);
 
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.DELETED("Comment"),

@@ -16,7 +16,6 @@ import fs from "fs/promises";
 export const getPosts: RequestHandler = async (req, res, next) => {
   try {
     const { search = "" } = req.query;
-    let response = {};
     let cachedPosts: string | null = "";
 
     if (!search) {
@@ -24,8 +23,8 @@ export const getPosts: RequestHandler = async (req, res, next) => {
     }
 
     if (cachedPosts) {
-      response = JSON.parse(cachedPosts);
-      res.status(HTTP_STATUS.OK).json({ response });
+      const response = JSON.parse(cachedPosts);
+      return res.status(HTTP_STATUS.OK).json({ response });
     } else {
       const postDetails = await db
         .select({
@@ -68,7 +67,7 @@ export const getPosts: RequestHandler = async (req, res, next) => {
         JSON.stringify(postDetails)
       );
 
-      res.status(HTTP_STATUS.OK).json({ postDetails });
+      return res.status(HTTP_STATUS.OK).json({ postDetails });
     }
   } catch (error) {
     next(error);
@@ -100,6 +99,8 @@ export const createPost: RequestHandler = async (req, res, next) => {
       },
     });
 
+    await redis.del(REDIS.CACHE_KEY.POSTS);
+
     return res.status(HTTP_STATUS.CREATED).json({
       message: MESSAGE.CREATED("Post"),
     });
@@ -115,7 +116,11 @@ export const editPost: RequestHandler = async (req, res, next) => {
     const { id: userId, role } = req.user as UserAttributes;
 
     const [post] = await db
-      .select()
+      .select({
+        id: posts.id,
+        title: posts.title,
+        userId: posts.userId,
+      })
       .from(posts)
       .where(and(eq(posts.id, id), isNull(posts.deletedAt)))
       .limit(1);
@@ -147,6 +152,8 @@ export const editPost: RequestHandler = async (req, res, next) => {
       },
     });
 
+    await redis.del(REDIS.CACHE_KEY.POSTS);
+
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.UPDATED("Post"),
     });
@@ -161,7 +168,11 @@ export const deletePost: RequestHandler = async (req, res, next) => {
     const { id: userId, role } = req.user as UserAttributes;
 
     const [post] = await db
-      .select()
+      .select({
+        id: posts.id,
+        title: posts.title,
+        userId: posts.userId,
+      })
       .from(posts)
       .where(and(eq(posts.id, id), isNull(posts.deletedAt)))
       .limit(1);
@@ -221,6 +232,8 @@ export const deletePost: RequestHandler = async (req, res, next) => {
         userId: post.userId,
       },
     });
+
+    await redis.del(REDIS.CACHE_KEY.POSTS);
 
     return res.status(HTTP_STATUS.OK).json({
       message: MESSAGE.DELETED("Post"),

@@ -59,7 +59,7 @@ export const login: RequestHandler = async (req, res, next) => {
       sameSite: "strict",
     });
 
-    res.status(HTTP_STATUS.OK).json({ accessToken });
+    return res.status(HTTP_STATUS.OK).json({ accessToken });
   } catch (error) {
     next(error);
   }
@@ -70,7 +70,7 @@ export const signup: RequestHandler = async (req, res, next) => {
     const { name, email, password }: SignUpBody = req.body;
 
     const [existingUser] = await db
-      .select()
+      .select({ id: users.id })
       .from(users)
       .where(and(eq(users.email, email), isNull(users.deletedAt)))
       .limit(1);
@@ -139,7 +139,7 @@ export const refreshAccessToken: RequestHandler = async (req, res, next) => {
       sameSite: "strict",
     });
 
-    res.status(HTTP_STATUS.OK).json({ accessToken: newAccessToken });
+    return res.status(HTTP_STATUS.OK).json({ accessToken: newAccessToken });
   } catch (error) {
     next(error);
   }
@@ -150,7 +150,7 @@ export const logout: RequestHandler = async (req, res, next) => {
     const user = req.user as UserAttributes;
     if (user && user.id) {
       const [userInfo] = await db
-        .select()
+        .select({ id: users.id })
         .from(users)
         .where(and(eq(users.id, user.id), isNull(users.deletedAt)))
         .limit(1);
@@ -163,12 +163,12 @@ export const logout: RequestHandler = async (req, res, next) => {
         });
         await db.update(users).set(updateData).where(eq(users.id, userInfo.id));
       } else {
-        res
+        return res
           .status(HTTP_STATUS.UNAUTHORIZED)
           .json({ message: MESSAGE.INVALID_REQUEST });
       }
     } else {
-      res
+      return res
         .status(HTTP_STATUS.UNAUTHORIZED)
         .json({ message: MESSAGE.INVALID_REQUEST });
     }
@@ -228,7 +228,7 @@ export const changePassword: RequestHandler = async (req, res, next) => {
       sameSite: "strict",
     });
 
-    res
+    return res
       .status(HTTP_STATUS.OK)
       .json({ accessToken, message: MESSAGE.UPDATED("Password") });
   } catch (error) {
