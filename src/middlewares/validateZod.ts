@@ -1,7 +1,7 @@
 import { z } from "../swagger/zod.js";
 import { ZodObject } from "zod";
 import { RequestHandler } from "express";
-import { HTTP_STATUS } from "../config/constants.js";
+import { HTTP_STATUS, MESSAGE } from "../config/constants.js";
 
 export const validate =
   (schema: ZodObject): RequestHandler =>
@@ -14,7 +14,7 @@ export const validate =
 
     if (!result.success) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        message: "Validation failed",
+        message: MESSAGE.VALIDATION_FAILED,
         errors: z.treeifyError(result.error),
       });
     }

@@ -38,6 +38,29 @@ export const HTTP_STATUS = {
   INTERNAL_SERVER_ERROR: 500,
 };
 
+export const MESSAGE = {
+  // Success
+  CREATED: (module: string) => `${module} created successfully`,
+  UPDATED: (module: string) => `${module} updated successfully`,
+  DELETED: (module: string) => `${module} deleted successfully`,
+  ADDED: (module: string) => `${module} added successfully`,
+  REMOVED: (module: string) => `${module} removed successfully`,
+  UPLOADED: (module: string) => `${module} uploaded successfully`,
+  ACTION_SUCCESS: (action: string) => `${action} successfully`,
+
+  // Client Error
+  INVALID_CREDENTIALS: "Invalid credentials",
+  INVALID_REQUEST: "Invalid request",
+  ALREADY_EXISTS: (module: string) => `${module} already exists`,
+  NOT_EXISTS: (module: string) => `${module} does not exists`,
+  REQUIRED: (module: string) => `${module} is required`,
+  UNAUTHORIZED: "Unauthorized",
+  VALIDATION_FAILED: "Validation failed",
+
+  // Server Error
+  INTERNAL_SERVER_ERROR: "Something went wrong",
+};
+
 export const SOCKET_EVENT = {
   POST: {
     CREATED: "POST_CREATED",

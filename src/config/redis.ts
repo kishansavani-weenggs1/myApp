@@ -1,7 +1,8 @@
 import { createClient } from "redis";
+import { ENV } from "./env.js";
 
 export const redis = createClient({
-  url: "redis://localhost:6379",
+  url: `redis://localhost:${ENV.REDIS_PORT}`,
 });
 
 redis.on("connect", () => {

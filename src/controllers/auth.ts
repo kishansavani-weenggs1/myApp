@@ -8,7 +8,7 @@ import { comparePassword } from "../utils/common.js";
 import jwt from "jsonwebtoken";
 import { JwtPayload } from "../types/jwt.js";
 import { ENV } from "../config/env.js";
-import { Constants, UserRole } from "../config/constants.js";
+import { Constants, MESSAGE, UserRole } from "../config/constants.js";
 import { UserAttributes } from "../types/models.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { db } from "../db/index.js";
@@ -30,7 +30,7 @@ export const login: RequestHandler = async (req, res, next) => {
     if (!user) {
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
-        .json({ message: "Invalid credentials" });
+        .json({ message: MESSAGE.INVALID_CREDENTIALS });
     }
 
     const isValid = await comparePassword(password, user.password);
@@ -38,7 +38,7 @@ export const login: RequestHandler = async (req, res, next) => {
     if (!isValid) {
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
-        .json({ message: "Invalid credentials" });
+        .json({ message: MESSAGE.INVALID_CREDENTIALS });
     }
 
     const refreshToken = generateRefreshToken(user);
@@ -77,7 +77,7 @@ export const signup: RequestHandler = async (req, res, next) => {
 
     if (existingUser) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        message: "User already exists",
+        message: MESSAGE.ALREADY_EXISTS("User"),
       });
     }
 
@@ -93,7 +93,7 @@ export const signup: RequestHandler = async (req, res, next) => {
     await db.insert(users).values(insertData);
 
     return res.status(HTTP_STATUS.CREATED).json({
-      message: "User created successfully",
+      message: MESSAGE.CREATED("User"),
     });
   } catch (error) {
     next(error);
@@ -106,7 +106,7 @@ export const refreshAccessToken: RequestHandler = async (req, res, next) => {
     if (!token)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Refresh token missing" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const payload = jwt.verify(token, ENV.JWT.REFRESH_SECRET) as JwtPayload;
 
@@ -118,7 +118,7 @@ export const refreshAccessToken: RequestHandler = async (req, res, next) => {
     if (!user || user.refreshToken !== token) {
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid refresh token" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
     }
 
     const newRefreshToken = generateRefreshToken(user);
@@ -165,10 +165,12 @@ export const logout: RequestHandler = async (req, res, next) => {
       } else {
         res
           .status(HTTP_STATUS.UNAUTHORIZED)
-          .json({ message: "Invalid request" });
+          .json({ message: MESSAGE.INVALID_REQUEST });
       }
     } else {
-      res.status(HTTP_STATUS.UNAUTHORIZED).json({ message: "Invalid request" });
+      res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ message: MESSAGE.INVALID_REQUEST });
     }
 
     // remove cookie from client
@@ -180,7 +182,7 @@ export const logout: RequestHandler = async (req, res, next) => {
 
     return res
       .status(HTTP_STATUS.OK)
-      .json({ message: "Logged out successfully" });
+      .json({ message: MESSAGE.ACTION_SUCCESS("Logged out") });
   } catch (error) {
     next(error);
   }
@@ -194,7 +196,7 @@ export const changePassword: RequestHandler = async (req, res, next) => {
     if (!user) {
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid credentials" });
+        .json({ message: MESSAGE.INVALID_CREDENTIALS });
     }
 
     const isValid = await comparePassword(oldPassword, user.password);
@@ -202,7 +204,7 @@ export const changePassword: RequestHandler = async (req, res, next) => {
     if (!isValid) {
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
-        .json({ message: "Invalid credentials" });
+        .json({ message: MESSAGE.INVALID_CREDENTIALS });
     }
 
     const refreshToken = generateRefreshToken(user);
@@ -228,7 +230,7 @@ export const changePassword: RequestHandler = async (req, res, next) => {
 
     res
       .status(HTTP_STATUS.OK)
-      .json({ accessToken, message: "Password Changed Successfully" });
+      .json({ accessToken, message: MESSAGE.UPDATED("Password") });
   } catch (error) {
     next(error);
   }

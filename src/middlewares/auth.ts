@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import passport from "passport";
 import { UserAttributes } from "../types/models.js";
-import { HTTP_STATUS } from "../config/constants.js";
+import { HTTP_STATUS, MESSAGE } from "../config/constants.js";
 
 export const authenticateJwt: RequestHandler = passport.authenticate("jwt", {
   session: false,
@@ -15,12 +15,12 @@ export const authorizeRoles =
     if (!user) {
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Unauthorized" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
     }
 
     if (!allowedRoles.includes(user?.role)) {
       return res.status(HTTP_STATUS.FORBIDDEN).json({
-        message: "Forbidden: You do not have access",
+        message: MESSAGE.UNAUTHORIZED,
       });
     }
 

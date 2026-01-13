@@ -12,8 +12,8 @@ const getEnv = (key: string, required = true): string => {
 
 export const ENV = {
   NODE_ENV: getEnv("NODE_ENV", false) || "development",
-
   APP_PORT: Number(getEnv("APP_PORT", false)) || 3000,
+  REDIS_PORT: Number(getEnv("REDIS_PORT", false)) || 6379,
 
   DB: {
     HOST: getEnv("DB_HOST"),
@@ -26,6 +26,7 @@ export const ENV = {
     ACCESS_SECRET: getEnv("JWT_ACCESS_SECRET"),
     REFRESH_SECRET: getEnv("JWT_REFRESH_SECRET"),
     ACCESS_EXPIRES_IN: Number(getEnv("JWT_ACCESS_EXPIRES_IN_HOURS")) * 60 * 60,
-    REFRESH_EXPIRES_IN: Number(getEnv("JWT_REFRESH_EXPIRES_IN_DAYS")) * 24 * 60 * 60,
+    REFRESH_EXPIRES_IN:
+      Number(getEnv("JWT_REFRESH_EXPIRES_IN_DAYS")) * 24 * 60 * 60,
   },
 };

@@ -2,7 +2,7 @@ import { RequestHandler } from "express";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { posts } from "../db/schema.js";
-import { HTTP_STATUS } from "../config/constants.js";
+import { HTTP_STATUS, MESSAGE } from "../config/constants.js";
 
 export const validatePostExists: RequestHandler = async (req, res, next) => {
   try {
@@ -17,7 +17,7 @@ export const validatePostExists: RequestHandler = async (req, res, next) => {
     if (!post) {
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Post not found" });
+        .json({ message: MESSAGE.NOT_EXISTS("Post") });
     }
 
     next();

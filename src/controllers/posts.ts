@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import { REDIS, UserRole } from "../config/constants.js";
+import { MESSAGE, REDIS, UserRole } from "../config/constants.js";
 import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
 import { broadcast } from "../websocket/broadcast.js";
 import { db } from "../db/index.js";
@@ -101,7 +101,7 @@ export const createPost: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.CREATED).json({
-      message: "Post created successfully",
+      message: MESSAGE.CREATED("Post"),
     });
   } catch (error) {
     next(error);
@@ -123,12 +123,12 @@ export const editPost: RequestHandler = async (req, res, next) => {
     if (!post)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Post does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Post") });
 
     if (post?.userId !== userId && role !== UserRole.ADMIN)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = updatePostSchema.parse({
       title,
@@ -148,7 +148,7 @@ export const editPost: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Post updated successfully",
+      message: MESSAGE.UPDATED("Post"),
     });
   } catch (error) {
     next(error);
@@ -169,12 +169,12 @@ export const deletePost: RequestHandler = async (req, res, next) => {
     if (!post)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Post does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Post") });
 
     if (post?.userId !== userId && role !== UserRole.ADMIN)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     await db.transaction(async (tx) => {
       const deleteData = softDeleteSchema.parse({
@@ -223,7 +223,7 @@ export const deletePost: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Post Deleted successfully",
+      message: MESSAGE.DELETED("Post"),
     });
   } catch (error) {
     next(error);

@@ -1,5 +1,10 @@
 import { RequestHandler } from "express";
-import { MessageStatus, SOCKET_EVENT, UserRole } from "../config/constants.js";
+import {
+  MESSAGE,
+  MessageStatus,
+  SOCKET_EVENT,
+  UserRole,
+} from "../config/constants.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { db } from "../db/index.js";
 import { messages, users } from "../db/schema.js";
@@ -51,7 +56,7 @@ export const createMessage: RequestHandler = async (req, res, next) => {
 
     if (!userInfo)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "User not found",
+        message: MESSAGE.NOT_EXISTS("User"),
       });
 
     const insertData = insertMessageSchema.parse({
@@ -79,7 +84,7 @@ export const createMessage: RequestHandler = async (req, res, next) => {
     }
 
     return res.status(HTTP_STATUS.CREATED).json({
-      message: "Message created successfully",
+      message: MESSAGE.CREATED("Message"),
       id: insertId,
     });
   } catch (error) {
@@ -102,12 +107,12 @@ export const editMessage: RequestHandler = async (req, res, next) => {
     if (!messageInfo)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Message does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Message") });
 
     if (messageInfo?.fromUserId !== userId)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = updateMessageSchema.parse({
       message,
@@ -128,7 +133,7 @@ export const editMessage: RequestHandler = async (req, res, next) => {
     }
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Message updated successfully",
+      message: MESSAGE.UPDATED("Message"),
     });
   } catch (error) {
     next(error);
@@ -149,12 +154,12 @@ export const deleteMessage: RequestHandler = async (req, res, next) => {
     if (!messageInfo)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Message does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Message") });
 
     if (messageInfo?.fromUserId !== userId && role !== UserRole.ADMIN)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = updateMessageSchema.parse({
       deletedId: userId,
@@ -174,7 +179,7 @@ export const deleteMessage: RequestHandler = async (req, res, next) => {
     }
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Message Deleted successfully",
+      message: MESSAGE.DELETED("Message"),
     });
   } catch (error) {
     next(error);

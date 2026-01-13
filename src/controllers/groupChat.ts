@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import { SOCKET_EVENT, UserRole } from "../config/constants.js";
+import { MESSAGE, SOCKET_EVENT, UserRole } from "../config/constants.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { db } from "../db/index.js";
 import {
@@ -75,7 +75,7 @@ export const createGroup: RequestHandler = async (req, res, next) => {
 
     if (total !== membersArr.length) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "User not found",
+        message: MESSAGE.NOT_EXISTS("User"),
       });
     }
 
@@ -114,7 +114,7 @@ export const createGroup: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.CREATED).json({
-      message: "Group created successfully",
+      message: MESSAGE.CREATED("Group"),
     });
   } catch (error) {
     next(error);
@@ -136,12 +136,12 @@ export const editGroup: RequestHandler = async (req, res, next) => {
     if (!groupInfo)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Group does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Group") });
 
     if (groupInfo?.groupAdminId !== userId && role !== UserRole.ADMIN)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = updateChatGroupSchema.parse({
       groupName,
@@ -151,7 +151,7 @@ export const editGroup: RequestHandler = async (req, res, next) => {
     await db.update(chatGroups).set(updateData).where(eq(chatGroups.id, id));
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Group updated successfully",
+      message: MESSAGE.UPDATED("Group"),
     });
   } catch (error) {
     next(error);
@@ -172,12 +172,12 @@ export const deleteGroup: RequestHandler = async (req, res, next) => {
     if (!groupInfo)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Group does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Group") });
 
     if (groupInfo?.groupAdminId !== userId && role !== UserRole.ADMIN)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     await db.transaction(async (tx) => {
       const deleteData = softDeleteSchema.parse({
@@ -206,7 +206,7 @@ export const deleteGroup: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Group Deleted successfully",
+      message: MESSAGE.DELETED("Group"),
     });
   } catch (error) {
     next(error);
@@ -225,7 +225,7 @@ export const addUserToGroup: RequestHandler = async (req, res, next) => {
 
     if (!user)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "User Not Found",
+        message: MESSAGE.NOT_EXISTS("User"),
       });
 
     const groupMemberId = await getGroupMemberId(userId, groupId);
@@ -243,7 +243,7 @@ export const addUserToGroup: RequestHandler = async (req, res, next) => {
     await db.insert(groupMembers).values(insertData);
 
     return res.status(HTTP_STATUS.CREATED).json({
-      message: "User added successfully",
+      message: MESSAGE.ADDED("User"),
     });
   } catch (error) {
     next(error);
@@ -279,7 +279,7 @@ export const removeUserFromGroup: RequestHandler = async (req, res, next) => {
 
     if (!groupMemberInfo)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "User Not Found",
+        message: MESSAGE.NOT_EXISTS("User"),
       });
 
     if (
@@ -288,7 +288,7 @@ export const removeUserFromGroup: RequestHandler = async (req, res, next) => {
     )
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = updateGroupMemberSchema.parse({
       deletedId: currentUserId,
@@ -301,7 +301,7 @@ export const removeUserFromGroup: RequestHandler = async (req, res, next) => {
       .where(eq(groupMembers.id, groupMemberInfo.groupMemberId));
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "User Removed successfully",
+      message: MESSAGE.REMOVED("User"),
     });
   } catch (error) {
     next(error);
@@ -317,7 +317,7 @@ export const getGroupMessages: RequestHandler = async (req, res, next) => {
 
     if (!chatGroupId)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "Group not found",
+        message: MESSAGE.NOT_EXISTS("Group"),
       });
 
     const messages = await db
@@ -366,14 +366,14 @@ export const createGroupMessage: RequestHandler = async (req, res, next) => {
 
     if (!chatGroupId)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "Group not found",
+        message: MESSAGE.NOT_EXISTS("Group"),
       });
 
     const groupMemberId = await getGroupMemberId(userId, groupId);
     if (!groupMemberId)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const insertData = insertGroupMessageSchema.parse({
       message,
@@ -396,7 +396,7 @@ export const createGroupMessage: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.CREATED).json({
-      message: "Message created successfully",
+      message: MESSAGE.CREATED("Message"),
       id: insertId,
     });
   } catch (error) {
@@ -414,14 +414,14 @@ export const editGroupMessage: RequestHandler = async (req, res, next) => {
 
     if (!chatGroupId)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "Group not found",
+        message: MESSAGE.NOT_EXISTS("Group"),
       });
 
     const groupMemberId = await getGroupMemberId(userId, groupId);
     if (!groupMemberId)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const [messageInfo] = await db
       .select()
@@ -438,12 +438,12 @@ export const editGroupMessage: RequestHandler = async (req, res, next) => {
     if (!messageInfo)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Message does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Message") });
 
     if (messageInfo?.fromUserId !== userId)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = updateGroupMessageSchema.parse({
       message,
@@ -465,7 +465,7 @@ export const editGroupMessage: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Message updated successfully",
+      message: MESSAGE.UPDATED("Message"),
     });
   } catch (error) {
     next(error);
@@ -486,12 +486,12 @@ export const deleteGroupMessage: RequestHandler = async (req, res, next) => {
     if (!messageInfo)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Message does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Message") });
 
     if (messageInfo?.fromUserId !== userId && role !== UserRole.ADMIN)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = updateGroupMessageSchema.parse({
       deletedId: userId,
@@ -512,7 +512,7 @@ export const deleteGroupMessage: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Message Deleted successfully",
+      message: MESSAGE.DELETED("Message"),
     });
   } catch (error) {
     next(error);

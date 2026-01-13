@@ -1,5 +1,9 @@
 import { RequestHandler } from "express";
-import { FileTypesForPosts, HTTP_STATUS } from "../config/constants.js";
+import {
+  FileTypesForPosts,
+  HTTP_STATUS,
+  MESSAGE,
+} from "../config/constants.js";
 import {
   UserAttributes,
   FileUploadCreationAttributes,
@@ -25,7 +29,7 @@ const uploadFile =
     if (!files.length) {
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
-        .json({ message: "File is required" });
+        .json({ message: MESSAGE.REQUIRED("File") });
     }
 
     try {
@@ -55,7 +59,7 @@ const uploadFile =
           id: row.id,
           url: insertData[index].url,
         })),
-        message: "Files uploaded successfully",
+        message: MESSAGE.UPLOADED("File(s)"),
       });
     } catch (error) {
       await Promise.all(

@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import { UserRole } from "../config/constants.js";
+import { MESSAGE, UserRole } from "../config/constants.js";
 import { HTTP_STATUS, SOCKET_EVENT } from "../config/constants.js";
 import { broadcast } from "../websocket/broadcast.js";
 import { db } from "../db/index.js";
@@ -21,7 +21,7 @@ export const getComments: RequestHandler = async (req, res, next) => {
 
     if (!postInfo)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "Post does not exists",
+        message: MESSAGE.NOT_EXISTS("Post"),
       });
 
     const commentDetails = await db
@@ -57,7 +57,7 @@ export const createComment: RequestHandler = async (req, res, next) => {
 
     if (!postInfo)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "Post does not exists",
+        message: MESSAGE.NOT_EXISTS("Post"),
       });
 
     const insertData = insertCommentSchema.parse({
@@ -82,7 +82,7 @@ export const createComment: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.CREATED).json({
-      message: "Comment created successfully",
+      message: MESSAGE.CREATED("Comment"),
     });
   } catch (error) {
     next(error);
@@ -99,7 +99,7 @@ export const editComment: RequestHandler = async (req, res, next) => {
 
     if (!postInfo)
       return res.status(HTTP_STATUS.NOT_FOUND).json({
-        message: "Post does not exists",
+        message: MESSAGE.NOT_EXISTS("Post"),
       });
 
     const [comment] = await db
@@ -117,12 +117,12 @@ export const editComment: RequestHandler = async (req, res, next) => {
     if (!comment)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Comment does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Comment") });
 
     if (comment?.userId !== userId && role !== UserRole.ADMIN)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = updateCommentSchema.parse({
       content,
@@ -142,7 +142,7 @@ export const editComment: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Comment updated successfully",
+      message: MESSAGE.UPDATED("Comment"),
     });
   } catch (error) {
     next(error);
@@ -162,12 +162,12 @@ export const deleteComment: RequestHandler = async (req, res, next) => {
     if (!comment)
       return res
         .status(HTTP_STATUS.NOT_FOUND)
-        .json({ message: "Comment does not exists" });
+        .json({ message: MESSAGE.NOT_EXISTS("Comment") });
 
     if (comment?.userId !== userId && role !== UserRole.ADMIN)
       return res
         .status(HTTP_STATUS.UNAUTHORIZED)
-        .json({ message: "Invalid Request" });
+        .json({ message: MESSAGE.UNAUTHORIZED });
 
     const updateData = softDeleteSchema.parse({
       deletedId: userId,
@@ -186,7 +186,7 @@ export const deleteComment: RequestHandler = async (req, res, next) => {
     });
 
     return res.status(HTTP_STATUS.OK).json({
-      message: "Comment Deleted successfully",
+      message: MESSAGE.DELETED("Comment"),
     });
   } catch (error) {
     next(error);
