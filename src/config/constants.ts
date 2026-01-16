@@ -97,7 +97,6 @@ export enum FileTypesForPosts {
 
 export const RESPONSE = {
   CLIENT_ERROR: "ClientErrorResponse",
-  UNAUTHORIZED_ERROR: "UnauthorizedErrorResponse",
   SERVER_ERROR: "ServerErrorResponse",
   VALIDATION_ERROR: "ValidationErrorResponse",
 };

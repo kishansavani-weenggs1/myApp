@@ -15,7 +15,7 @@ export const validate =
     if (!result.success) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({
         message: MESSAGE.VALIDATION_FAILED,
-        errors: z.treeifyError(result.error),
+        errors: z.prettifyError(result.error),
       });
     }
 

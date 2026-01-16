@@ -8,18 +8,10 @@ export const ErrorSchema = z.object({
   message: z.string().openapi({ example: "Something went wrong" }),
 });
 
-export const UnauthorizedErrorSchema = z
-  .string()
-  .openapi({ example: "Unauthorized" });
-
 export const ValidationErrorSchema = z.object({
-  message: z.string().openapi({ example: "Something went wrong" }),
-  errors: z
-    .array(
-      z.object({
-        field: z.string(),
-        message: z.string(),
-      })
-    )
-    .optional(),
+  message: z.string().openapi({ example: "Validation failed" }),
+  errors: z.string().openapi({
+    example:
+      "✖ Invalid input: expected string, received undefined  → at somewhere",
+  }),
 });

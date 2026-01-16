@@ -66,11 +66,6 @@ export const withCommonResponses = (
       $ref: `#/components/responses/${RESPONSE.VALIDATION_ERROR}`,
     };
 
-  if (!excludeErrors.includes(HTTP_STATUS.UNAUTHORIZED))
-    commonResponses[HTTP_STATUS.UNAUTHORIZED] = {
-      $ref: `#/components/responses/${RESPONSE.UNAUTHORIZED_ERROR}`,
-    };
-
   if (includeForbiddenError)
     commonResponses[HTTP_STATUS.FORBIDDEN] = {
       $ref: `#/components/responses/${RESPONSE.CLIENT_ERROR}`,

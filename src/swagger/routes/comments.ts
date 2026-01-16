@@ -31,19 +31,16 @@ registry.registerPath({
     query: getCommentsSchema.shape.query,
   },
 
-  responses: withCommonResponses(
-    {
-      [HTTP_STATUS.OK]: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: GetCommentsResponseSchema,
-          },
+  responses: withCommonResponses({
+    [HTTP_STATUS.OK]: {
+      description: "Success",
+      content: {
+        "application/json": {
+          schema: GetCommentsResponseSchema,
         },
       },
     },
-    [HTTP_STATUS.UNAUTHORIZED]
-  ),
+  }),
 });
 
 registry.registerPath({
@@ -64,19 +61,16 @@ registry.registerPath({
     },
   },
 
-  responses: withCommonResponses(
-    {
-      [HTTP_STATUS.CREATED]: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: commonSuccessResponseSchema,
-          },
+  responses: withCommonResponses({
+    [HTTP_STATUS.CREATED]: {
+      description: "Success",
+      content: {
+        "application/json": {
+          schema: commonSuccessResponseSchema,
         },
       },
     },
-    [HTTP_STATUS.UNAUTHORIZED]
-  ),
+  }),
 });
 
 registry.registerPath({

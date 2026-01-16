@@ -3,9 +3,23 @@ import passport from "passport";
 import { UserAttributes } from "../types/models.js";
 import { HTTP_STATUS, MESSAGE } from "../config/constants.js";
 
-export const authenticateJwt: RequestHandler = passport.authenticate("jwt", {
-  session: false,
-});
+export const authenticateJwt: RequestHandler = (req, res, next) => {
+  passport.authenticate(
+    "jwt",
+    {
+      session: false,
+    },
+    (err: Error | null, user: UserAttributes | false) => {
+      if (err) return next(err);
+      if (!user)
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+          message: MESSAGE.UNAUTHORIZED,
+        });
+
+      next();
+    }
+  )(req, res, next);
+};
 
 export const authorizeRoles =
   (...allowedRoles: string[]): RequestHandler =>
@@ -31,7 +45,7 @@ export const optionalAuth: RequestHandler = (req, res, next) => {
   passport.authenticate(
     "jwt",
     { session: false },
-    (err: Error | null, user: UserAttributes) => {
+    (err: Error | null, user: UserAttributes | false) => {
       if (err) return next(err);
 
       if (user) {

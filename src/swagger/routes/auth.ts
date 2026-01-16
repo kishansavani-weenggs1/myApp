@@ -51,7 +51,7 @@ registry.registerPath({
         },
       },
     },
-    [HTTP_STATUS.UNAUTHORIZED, HTTP_STATUS.NOT_FOUND]
+    [HTTP_STATUS.NOT_FOUND]
   ),
 });
 
@@ -84,7 +84,7 @@ registry.registerPath({
         },
       },
     },
-    [HTTP_STATUS.UNAUTHORIZED, HTTP_STATUS.NOT_FOUND]
+    [HTTP_STATUS.NOT_FOUND]
   ),
 });
 
